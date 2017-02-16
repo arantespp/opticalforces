@@ -6,10 +6,6 @@ import scipy.special as ss
 from astropy.table import Table
 
 
-# Speed of light.
-c = 299792458
-
-
 class Beam:
     """Generic scope for a beam in cilindrical coordinates. By default,
     this class is a plane wave.
@@ -528,7 +524,7 @@ class BGBS(Beam):
             elif point.z == 0:
                 arg = (-point.rho**2
                        *(self.params['qr']-2j*ma.pi*n/self.params['L']))
-                return self.self.vec_An[n+self.params['N']]*cm.exp(arg)
+                return self.vec_An[n+self.params['N']]*cm.exp(arg)
 
             else:
                 return 0
