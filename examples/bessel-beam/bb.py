@@ -15,6 +15,9 @@ krho = 2.39e4
 # ideal bessel beam
 ibb = IBB(order=0, nm=1, wavelength=wl, krho=krho)
 
+with open("beam-parameters.txt", 'w') as f:
+    f.write(str(ibb))
+
 Rmax = 2e-3
 Zmax = Rmax/tan(ibb.params['theta'])
 

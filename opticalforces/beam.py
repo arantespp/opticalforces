@@ -76,10 +76,12 @@ class Beam:
             raise NameError('Cannot define' + msg + ' parameters')
 
     def __str__(self):
-        return ('name:'
-                + str(self.name)
-                + '-params:'
-                + str(self.params))
+        out = 'name: ' + str(self.name) + '\n'
+        out += 'parameters:\n'
+        for param in self.params:
+            out += '    ' + param + ': ' + str(self.params[param])
+            out += '\n'
+        return out
 
     def psi(self, pt):
         """ Wave's equation 'psi'.
