@@ -1,12 +1,299 @@
-import cmath as cm
 import math as ma
+from math import pi
+import cmath as cm
 import numpy as np
 import scipy.special as ss
+from functools import wraps
 
-from astropy.table import Table
+class Beam(object):
+    def __init__(self):
+        self.beams = [self]
+        self._name = 'generic-beam'
+
+    def __init__(self, beams, name='generic-beam'):
+        self.beams = beams
+        self._name = name
+
+    def __str__(self):
+        out = 'name: ' + self._name + '\n'
+        for i, beam in enumerate(self.beams):
+            out += 'beam: %d' % (i+1) + '\n'
+            out += str(beam)
+        return out
+
+    def __add__(self, other):
+        beams = list(self.beams) + list(other.beams)
+        return Beam(beams)
+
+    @property
+    def amplitude(self):
+        return self._amplitude
+
+    @amplitude.setter
+    def amplitude(self, value):
+        self._amplitude = value
+
+    @property
+    def phase(self):
+        return self._phase
+
+    @phase.setter
+    def phase(self, value):
+        self._phase = value
+
+    def add_phase(psi):
+        @ wraps(psi)
+        def psi_args(self, pt):
+            return psi(self, pt)*cm.exp(1j*self._phase)
+        return psi_args
+
+    def psi(self, pt):
+        return sum([beam.psi(pt) for beam in self.beams])
+
+    def intensity(self, pt):
+        """ Wave's intensity.
+
+        Args:
+            pt (:obj:'Point'): point at which want to calculate wave's
+                intensity, that is psi's abs squared.
+
+        Returns:
+            Wave's intensity.
+
+        """
+        return abs(self.psi(pt))**2
+
+    def k0(self, pt):
+        """ k0 vector's direction.
+
+        k0 vector's direction is defined by gradient of phase function.
+        This method makes the phase derivative in x, y and z using Fi-
+        nite Difference Coefficients found on
+        http://web.media.mit.edu/~crtaylor/calculator.htm site.
+
+        Args:
+            pt (:obj:'Point'): point at which want to calculate wave's
+                k0 vector's direction.
+
+        Returns:
+            A list containing the normalized k0 vector - [kx, ky, kz]
+
+        """
+
+        # Delta
+        h = 1e-10
+
+        # Denominator coefficient
+        den = 60*h
+
+        # Locations of Sampled Points
+        lsp = [-3, -2, -1, 0, 1, 2, 3]
+
+        # Finite Difference Coefficients
+        fdc = [-1, 9, -45, 0, 45, -9, 1]
+
+        # Psi calculated over samples points
+        psix = list(map(
+            lambda i: self.psi(Point(pt.x + i*h, pt.y, pt.z)), lsp))
+
+        psiy = list(map(
+            lambda i: self.psi(Point(pt.x, pt.y + i*h, pt.z)), lsp))
+
+        psiz = list(map(
+            lambda i: self.psi(Point(pt.x, pt.y, pt.z + i*h)), lsp))
+
+        # Psi derivative
+        psi_x = np.dot(fdc, psix) / den
+        psi_y = np.dot(fdc, psiy) / den
+        psi_z = np.dot(fdc, psiz) / den
+
+        # k0 components
+        psi = self.psi(pt)
+        k0x = (psi_x / psi).imag
+        k0y = (psi_y / psi).imag
+        k0z = (psi_z / psi).imag
+
+        # normalize k0 vector
+        if k0x != 0 or k0y != 0 or k0z != 0:
+            k = [k0x, k0y, k0z]
+            return k / np.linalg.norm(k)
+        else:
+            return [0, 0, 1]
 
 
-class Beam:
+class PlaneWave(Beam):
+    def __init__(self):
+        self.beams = [self]
+
+        self._name = 'plane-wave'
+        self._amplitude = 1
+        self._phase = 0
+        self._wavelength = None
+        self._k = None
+        self._nm = None
+
+        self.params = ('_name',
+                       '_amplitude',
+                       '_phase',
+                       '_wavelength',
+                       '_k',
+                       '_nm',)
+
+    def __str__(self):
+        out = ''
+        for param in self.params:
+            out += '    '
+            out += param + ': ' + str(self.__dict__[param])
+            out += '\n'
+        return out[:]
+
+    @property
+    def wavelength(self):
+        return self._wavelength
+
+    @wavelength.setter
+    def wavelength(self, value):
+        self._wavelength = value
+        #self.__set_wavelength()
+        self.__set_k()
+        self.__set_nm()
+
+    @property
+    def k(self):
+        return self._k
+
+    @k.setter
+    def k(self, value):
+        self._k = value
+        self.__set_wavelength()
+        #self.__set_k()
+        self.__set_nm()
+
+    @property
+    def nm(self):
+        return self._k
+
+    @nm.setter
+    def nm(self, value):
+        self._nm = value
+        self.__set_wavelength()
+        self.__set_k()
+        #self.__set_nm()
+
+    def __set_wavelength(self):
+        if self._k is not None and self._nm is not None:
+            self._wavelength = self._nm*2*pi/self.k
+
+    def __set_k(self):
+        if self._wavelength is not None and self._nm is not None:
+            self._k = self._nm*2*pi/self.wavelength
+
+    def __set_nm(self):
+        if self._wavelength is not None and self._k is not None:
+            self._nm = self.wavelength*self._k/(2*pi)
+
+    @Beam.add_phase
+    def psi(self, pt):
+        """ Wave's equation 'psi'.
+
+        Args:
+            pt (:obj:'Point'): point at which want to calculate 'psi'
+                value.
+
+        Returns:
+            Wave's equation complex value of default plane wave decla-
+                red on beam class.
+
+        """
+        return self._amplitude*cm.exp(1j*self.k*pt.z)
+
+class BesselBeam(PlaneWave):
+    def __init__(self):
+        PlaneWave.__init__(self)
+
+        self._name = 'bessel-beam'
+
+        self._krho = None
+        self._kz = None
+        self._theta = None
+        self._order = 0
+
+        self.params += ('_krho',
+                        '_kz',
+                        '_theta',
+                        '_order',)
+
+    @property
+    def krho(self):
+        return self._krho
+
+    @krho.setter
+    def krho(self, value):
+        self._krho = value
+        self._kz = ma.sqrt(self._k**2 - value**2)
+        self._theta = ma.atan(self._krho/self._kz)
+
+    @property
+    def kz(self):
+        return self._kz
+
+    @krho.setter
+    def kz(self, value):
+        self._kz = value
+        self._krho = ma.sqrt(self._k**2 - value**2)
+        self._theta = ma.atan(self._krho/self._kz)
+
+    @property
+    def theta(self):
+        return self._theta
+
+    @theta.setter
+    def theta(self, value):
+        self._theta = value
+        self._krho = self._k*ma.sin(value)
+        self._kz = self._k*ma.cos(value)
+
+    @property
+    def order(self):
+        return self._order
+
+    @order.setter
+    def order(self, value):
+        self._order = value
+
+    @Beam.add_phase
+    def psi(self, pt):
+        return (ss.jv(self._order, self._krho*pt.rho)
+                * cm.exp(1j*self._kz*pt.z)
+                * cm.exp(1j*self._order*pt.phi))
+
+class GaussianBeam(PlaneWave):
+    def __init__(self):
+        PlaneWave.__init__(self)
+
+        self._name = 'gaussian-beam'
+
+        self._q = 1
+
+        self.params += ('_q',)
+
+    @property
+    def q(self):
+        return self._q
+
+    @q.setter
+    def q(self, value):
+        self._q = q
+
+    @Beam.add_phase
+    def psi(self, pt):
+        return ((1/(1+1j*pt.z*2*self._q/self._k))
+                * cm.exp(1j*pt.z*self._k)
+                * cm.exp((-self._q*pt.rho**2)
+                         / (1 + 1j*pt.z*2*self._q / self._k)))
+
+
+'''class Beam:
     """Generic scope for a beam in cilindrical coordinates. By default,
     this class is a plane wave.
 
@@ -24,7 +311,7 @@ class Beam:
             'k': 2*cm.pi/1064e-9
         }
 
-    # if two parameters in nm, wavelenght and k is defined and the
+    # if two parameters in nm, wavelength and k is defined and the
     # third one is not, this function define it.
     def _set_wavelength_group(self):
 
@@ -34,7 +321,7 @@ class Beam:
         # means, it cannot define a parameter anymore or all parameters
         # are already defined.
         while True:
-            parametersChanged = False
+            params_changed = False
 
             if (self.params['nm'] is not None
                     and self.params['wavelength'] is not None
@@ -45,21 +332,21 @@ class Beam:
                   and self.params['wavelength'] is not None):
                 self.params['k'] = (self.params['nm'] * 2*ma.pi
                                     / self.params['wavelength'])
-                parametersChanged = True
+                params_changed = True
 
             elif (self.params['nm'] is not None
                   and self.params['k'] is not None):
                 self.params['wavelength'] = (self.params['nm']*2*ma.pi
                                              / self.params['k'])
-                parametersChanged = True
+                params_changed = True
 
             elif (self.params['wavelength'] is not None
                   and self.params['k'] is not None):
                 self.params['nm'] = (self.params['wavelength']
                                      * self.params['k'] / (2*ma.pi))
-                parametersChanged = True
+                params_changed = True
 
-            if parametersChanged is False:
+            if params_changed is False:
                 break
 
         # raise a error with all non defined parameters
@@ -106,80 +393,91 @@ class Beam:
         """
         return abs(self.psi(pt))**2
 
-    def RS(self, pt, Rmax, Rmin=0, npRho=501, npPhi=3):
+    def RS(self, pt, r_max, r_min=0, **kwargs):
         """ Wave's Raleigh-Sommerfeld integral by 1/3 Simpson's Rule.
 
         Args:
             pt (:obj:'Point'): point at which want to calculate wave's
                 Rayleigh-Sommerfeld complex value.
-            Rmax: aperture radius that will be used to simulate the
+            r_max: aperture radius that will be used to simulate the
                 wave aperture truncate.
-            npRho: rho's variable 1/3 Simpson's Rule discretization.
+            np_rho: rho's variable 1/3 Simpson's Rule discretization.
                 a.k.a: Rho's number points.
-            npPhi: phi's variable 1/3 Simpson's Rule discretization.
+            np_phi: phi's variable 1/3 Simpson's Rule discretization.
                 a.k.a: Phi's number points.
 
         Returns:
             Raleigh-Sommerfeld complex value at a specific point 'pt'
-                given a aperture with radius 'Rmax'.
+                given a aperture with radius 'r_max'.
 
         """
+        np_rho = 501
+        np_phi = 3
+
+        for key in kwargs:
+            if key == 'np_rho':
+                np_rho = kwargs[key]
+            elif key == 'np_phi':
+                np_phi = kwargs[key]
+            else:
+                pass
 
         # RS integral's integrand
         def R(rho, phi):
-            return (pt - Point(rho, phi, 0, 'cilin')).r
-
-        def E(rho, phi):
-            return cm.exp(1j*self.params['k']*R(rho, phi))
+            return (pt - Point(rho, phi, 0, 'cilin')).abs()
 
         def integrand(rho, phi):
             return (rho*self.psi(Point(rho, phi, 0, 'cilin'))
-                    *E(rho, phi) / R(rho, phi)**2)
+                    * cm.exp(1j*self.params['k']*R(rho, phi))
+                    / R(rho, phi)**2)
 
         # S: 1/3 Simp's rule auxiliary matrix.
-        auxrhovec = [1 if (rho == 0 or rho == npRho - 1) \
-            else (4 if rho % 2 != 0 else 2) for rho in range(npRho)]
+        def matrix_s():
+            auxrhovec = [1 if (r == 0 or r == np_rho - 1) \
+                else (4 if r % 2 != 0 else 2) for r in range(np_rho)]
 
-        auxphivec = [1 if (phi == 0 or phi == npPhi - 1) \
-            else (4 if phi % 2 != 0 else 2) for phi in range(npPhi)]
+            auxphivec = [1 if (p == 0 or p == np_phi - 1) \
+                else (4 if p % 2 != 0 else 2) for p in range(np_phi)]
 
-        S = [[i * j for i in auxrhovec] for j in auxphivec]
+            return [[i * j for i in auxrhovec] for j in auxphivec]
 
         # F: 'integrand' mapped at discretized RS points.
-        rhovec = np.linspace(Rmin, Rmax, npRho)
+        def matrix_f():
+            rhovec = np.linspace(r_min, r_max, np_rho)
 
-        phivec = np.linspace(0, 2*ma.pi, npPhi)
+            phivec = np.linspace(0, 2*ma.pi, np_phi)
 
-        F = [[pt.z*integrand(rho, phi) / (1j*self.params['wavelength'])
-              for rho in rhovec] for phi in phivec]
+            return [[(pt.z*integrand(rho, phi)
+                      / (1j*self.params['wavelength']))
+                     for rho in rhovec] for phi in phivec]
 
         # Hadamard product between 'F' and 'S'
-        H = sum(sum(np.multiply(F, S)))
+        H = sum(sum(np.multiply(matrix_f(), matrix_s())))
 
         # Interval's discretization
-        hrho = (Rmax - Rmin) / (npRho-1)
-        hphi = 2*ma.pi / (npPhi-1)
+        hrho = (r_max - r_min) / (np_rho-1)
+        hphi = 2*ma.pi / (np_phi-1)
 
         return hphi*hrho*H/9
 
-    def RSI(self, pt, Rmax):
+    def RSI(self, pt, r_max):
         """ Wave's Raleigh-Sommerfeld integral intensity.
 
         Args:
             pt (:obj:'Point'): point at which want to calculate wave's
                 Rayleigh-Sommerfeld complex value.
-            Rmax: aperture radius that will be used to simulate the
+            r_max: aperture radius that will be used to simulate the
                 wave aperture truncate.
 
         Returns:
             Raleigh-Sommerfeld intensity value at a specific point 'pt'
-                given a aperture with radius 'Rmax'.
+                given a aperture with radius 'r_max'.
 
         """
 
-        return abs(self.RS(pt, Rmax))**2
+        return abs(self.RS(pt, r_max))**2
 
-    ''' l '''
+
     def k0(self, pt):
         """ k0 vector's direction.
 
@@ -311,16 +609,13 @@ class IBB(Beam):
         assert self.params['order'] is not None, \
             ('Bessel beam order not defined')
 
-        group0 = ('krho', 'spot')
-        group1 = ('k', 'krho', 'kz', 'theta')
-
         # Verify if all parameters can be defined given currently para-
         # meters that was already defined at class instance. This loop
         # will stop if there is no change in any parameter, which
         # means, it cannot define a parameter anymore or all parameters
         # are already defined.
         while True:
-            parametersChanged = False
+            params_changed = False
 
             # group 0
             if (self.params['krho'] is not None
@@ -330,12 +625,12 @@ class IBB(Beam):
             elif self.params['krho'] is not None:
                 self.params['spot'] = (ss.jn_zeros(
                     self.params['order'], 1)[0]/self.params['krho'])
-                parametersChanged = True
+                params_changed = True
 
             elif self.params['spot'] is not None:
                 self.params['krho'] = (ss.jn_zeros(
                     self.params['order'], 1)[0]/self.params['spot'])
-                parametersChanged = True
+                params_changed = True
 
             # group 1
             if (self.params['k'] is not None
@@ -350,7 +645,7 @@ class IBB(Beam):
                                                 / self.params['k']))
                 self.params['kz'] = (ma.sqrt(self.params['k']**2
                                              - self.params['krho']**2))
-                parametersChanged = True
+                params_changed = True
 
             elif (self.params['k'] is not None
                   and self.params['kz'] is not None):
@@ -358,7 +653,7 @@ class IBB(Beam):
                                                 / self.params['k']))
                 self.params['krho'] = (ma.sqrt(self.params['k']**2
                                                - self.params['kz']**2))
-                parametersChanged = True
+                params_changed = True
 
             elif (self.params['k'] is not None
                   and self.params['theta'] is not None):
@@ -366,7 +661,7 @@ class IBB(Beam):
                                        * ma.sin(self.params['theta']))
                 self.params['kz'] = (self.params['k']
                                      * ma.cos(self.params['theta']))
-                parametersChanged = True
+                params_changed = True
 
             elif (self.params['krho'] is not None
                   and self.params['kz'] is not None):
@@ -374,7 +669,7 @@ class IBB(Beam):
                                             + self.params['kz']**2))
                 self.params['theta'] = (ma.atan(self.params['krho']
                                                 / self.params['kz']))
-                parametersChanged = True
+                params_changed = True
 
             elif (self.params['krho'] is not None
                   and self.params['theta'] is not None):
@@ -382,7 +677,7 @@ class IBB(Beam):
                                     / ma.cos(self.params['theta']))
                 self.params['kz'] = (self.params['krho']
                                      / ma.tan(self.params['theta']))
-                parametersChanged = True
+                params_changed = True
 
             elif (self.params['kz'] is not None
                   and self.params['theta'] is not None):
@@ -390,9 +685,9 @@ class IBB(Beam):
                                     / ma.sin(self.params['theta']))
                 self.params['krho'] = (self.params['z']
                                        * ma.tan(self.params['theta']))
-                parametersChanged = True
+                params_changed = True
 
-            if parametersChanged is False:
+            if params_changed is False:
                 break
 
         msg = ''
@@ -477,9 +772,9 @@ class BGBS(Beam):
                 and self.params['qr'] == qr_default):
             self.params['qr'] = 6 / self.params['L']
 
-        self.vec_An = []
+        self.vec_an = []
         for i in range(2*self.params['N']+1):
-            self.vec_An.append(self.An(i-self.params['N']))
+            self.vec_an.append(self.An(i-self.params['N']))
 
     def An(self, n):
         arg = (self.params['qr'] - self.params['q']
@@ -518,29 +813,20 @@ class BGBS(Beam):
                 return cm.exp(arg)
 
             if point.z != 0:
-                return (B()*E()*self.vec_An[n+self.params['N']]
+                return (B()*E()*self.vec_an[n+self.params['N']]
                         /self.Qn(n, point))
 
             elif point.z == 0:
                 arg = (-point.rho**2
                        *(self.params['qr']-2j*ma.pi*n/self.params['L']))
-                return self.vec_An[n+self.params['N']]*cm.exp(arg)
+                return self.vec_an[n+self.params['N']]*cm.exp(arg)
 
             else:
                 return 0
 
         return M()*sum(map(S, i))
 
-
-class Particle:
-    def __init__(self, **kwargs):
-        self.params = {}
-        for key in kwargs:
-            self.params[key] = kwargs[key]
-
-    def __str__(self):
-        return 'Particle params: ' + str(self.params)
-
+'''
 
 class Point:
     def __init__(self, v1, v2, v3, *system):
@@ -600,7 +886,7 @@ class Point:
             if self.y < 0:
                 self.phi = -ma.pi/2
             elif self.y == 0:
-                self.phi = 0
+                self.phi = 0.0
             else:
                 self.phi = ma.pi/2
 
@@ -609,80 +895,36 @@ class Point:
         if self.r != 0:
             self.theta = ma.acos(z / self.r)
         else:
-            self.theta = 0
+            self.theta = 0.0
 
+    def abs(self):
+        return self.r
 
-# Round a number to 'sig' significatives figures.
-'''def round_sig(num, sig=4):
-    if num < 0:
-        num = -num
-        return -round(num, sig-int(ma.floor(ma.log10(num)))-1)
-    elif num > 0:
-        return +round(num, sig-int(ma.floor(ma.log10(num)))-1)
-    # num == 0
-    else:
-        return num'''
+    def normalize(self):
+        return [self.x/self.r, self.z/self.r, self.z/self.r]
 
-'''
-    Main call, just for tests porpouse
-'''
 if __name__ == "__main__":
-    import time
+    #print("Please, visit: https://github.com/arantespp/opticalforces")
 
-    wl = 632.8 * 10 ** -9
-    k = 9.93 * 10 ** 6
-    krho = 4.07 * 10 ** 4
-    R = 3.5 * 10 ** -3
+    b = PlaneWave()
+    b.nm = 1
+    b.k = 5
+    b.amplitude = 3
 
-    beam = Beam()
-    # ideal gaussiam beam
-    igb = IGB(nm=1, wavelength=wl, q=0)
-    # ideal bessel beam
-    ibb = IBB(order = 0, nm=1, wavelength=wl, krho=krho)
-    # bessel gauss beam superpositon
-    bgbs = BGBS(igb, ibb, N=23, R=R)
+    c = BesselBeam()
+    c.nm = 4
+    c.order = 3
+    c.k = 100
+    c.phase = 0.99
+    c.krho = 23
+    c.theta = 0.23207768
 
-    #ptc = Particle(Rp=10e-6, np=1.6, alphap=0.5e6)
+    a = GaussianBeam()
+    a.nm = 2
+    a.k = 78
 
-    #t0 = time.time()
-    print(bgbs.RS(Point(0, 0, 1), 10e-3, 0.5e-3))
-    #bbs = BBS(lambda z: z)
-    #print(bbs.ref(2))
-    #print(time.time()-t0)
+    d = b + c + a
 
-    '''vecz = np.linspace(0.95 * bgbs.params['Zmax'], 1 * bgbs.params['Zmax'], 501)
-
-    listPositions = list(map(lambda z: Point(0, 0, z), vecz))
-
-    rsi = [bgbs.psi(particlePosition).real for particlePosition in listPositions]
-
-    plt.figure(1)
-
-    plt.plot(vecz, rsi, '-')
-    plt.axvline(x=bgbs.params['Zmax'], color='r', linestyle='--', linewidth=0.75)
-    plt.grid()
-
-    plt.show()'''
-
-
-    '''vecz = np.linspace(0.15 * bgbs.params['Zmax'], 1.25 * bgbs.params['Zmax'], 501)
-
-    listPositions = list(map(lambda z: Point(0, 0, z), vecz))
-
-    rsi = [ibb.RSI(particlePosition, bgbs.params['R']) for particlePosition in listPositions]
-
-    #print(ibb.RS(Point(0,0,1), bgbs.params['R']))
-
-    plt.figure(1)
-
-    plt.subplot(211)
-    plt.plot(vecz, [bgbs.I(Point(0, 0, z)) for z in vecz], '-')
-    plt.axvline(x=bgbs.params['Zmax'], color='r', linestyle='--', linewidth=0.75)
-    plt.grid()
-
-    plt.subplot(212)
-    plt.plot(vecz, rsi, '-')
-    plt.axvline(x=bgbs.params['Zmax'], color='r', linestyle='--', linewidth=0.75)
-    plt.grid()
-
-    plt.show()'''
+    #print(b)
+    #print(c.intensity(Point(1,2,3)))
+    print(d.k0(Point(1,2,3)))
