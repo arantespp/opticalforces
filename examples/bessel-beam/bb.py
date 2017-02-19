@@ -6,20 +6,23 @@ from mpl_toolkits.mplot3d import Axes3D
 
 sys.path.insert(0, '/home/arantespp/Dropbox/Mestrado/opticalforces/opticalforces')
 
-from beam import IBB, Point
+from beam import *
 
 # wavelength
 wl = 500e-9
 krho = 2.39e4
 
 # ideal bessel beam
-ibb = IBB(order=0, nm=1, wavelength=wl, krho=krho)
+ibb = BesselBeam()
+ibb.nm = 1
+ibb.wavelength = wl
+ibb.krho = krho
 
 with open("beam-parameters.txt", 'w') as f:
     f.write(str(ibb))
 
 Rmax = 2e-3
-Zmax = Rmax/tan(ibb.params['theta'])
+Zmax = Rmax/tan(ibb.theta)
 
 rho = np.linspace(-Rmax*1e3, Rmax*1e3, 501)
 

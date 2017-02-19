@@ -15,19 +15,20 @@ k = 9.93e6
 krho = 4.07e4
 R = 3.5e-3
 
-beam = Beam()
-# ideal gaussiam beam
-igb = IGB(nm=1, wavelength=wl, q=0)
-# ideal bessel beam
-ibb = IBB(order = 0, nm=1, wavelength=wl, krho=krho)
 # bessel gauss beam superpositon
-bgbs = BGBS(igb, ibb, N=23, R=R)
+bgbs = BesselGaussBeamSuperposition()
+bgbs.wavelength = wl
+bgbs.k = k
+bgbs.krho = krho
+bgbs.R = R
+bgbs.N = 23
+bgbs.q = 0
 
 with open("beam-parameters.txt", 'w') as f:
     f.write(str(bgbs))
 
-Rmax = bgbs.params['R']
-Zmax = bgbs.params['Zmax']
+Rmax = bgbs.R
+Zmax = bgbs.z_max
 
 rho = np.linspace(-1.25*Rmax*1e3, 1.25*Rmax*1e3, 501)
 z = np.linspace(0, 1.25*Zmax, 250)
@@ -68,7 +69,7 @@ plt.savefig('perfil2D.png')
 # plot RS intensity
 plt.figure(3, figsize=(heigth*1.618, heigth))
 
-z = np.linspace(0.12*Zmax, 1.25*Zmax, 800)
+z = np.linspace(0.125*Zmax, 1.25*Zmax, 800)
 
 plt.plot(z, [bgbs.RSI(Point(0, 0, z), Rmax) for z in z], '-')
 plt.axvline(x=Zmax, color='r', linestyle='--', linewidth=0.75, label=r'$Z_{max}$')
@@ -87,8 +88,8 @@ plt.savefig('RS-perfil2D.png')
 plt.figure(4, figsize=(heigth*1.618, heigth))
 axes = plt.gca(projection='3d')
 
-Rmax = 0.25*bgbs.params['R']*1e3
-Zmax = 1.25*bgbs.params['Zmax']
+Rmax = 0.25*bgbs.R*1e3
+Zmax = 1.25*bgbs.z_max
 
 rho = np.linspace(-Rmax, Rmax, 101)
 z = np.linspace(0, Zmax, 100)
