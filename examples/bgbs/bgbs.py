@@ -118,3 +118,5 @@ axes.set_zlabel(r'I($\rho$, z)', fontsize=16)
 axes.view_init(elev=35, azim=-35)
 
 plt.savefig('perfil3D.png')
+
+plt.show()

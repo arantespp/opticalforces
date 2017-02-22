@@ -7,16 +7,13 @@ from scipy.integrate import quad
 from functools import wraps
 
 class Beam(object):
-    def __init__(self):
-        self.beams = [self]
-        self._name = 'generic-beam'
-
     def __init__(self, beams, name='generic-beam'):
         self.beams = beams
-        self._name = name
+        self.name = name
+        self.params = None
 
     def __str__(self):
-        out = 'name: ' + self._name + '\n'
+        out = 'name: ' + self.name + '\n'
         for i, beam in enumerate(self.beams):
             out += '\n' + 'beam %d (%d)' %(i+1, i-len(self.beams)//2)
             out += '\n' + str(beam)
@@ -41,6 +38,14 @@ class Beam(object):
     @phase.setter
     def phase(self, value):
         self._phase = value
+
+    @property
+    def beta(self):
+        return self._beta
+
+    @beta.setter
+    def beta(self, value):
+        self._beta = value
 
     def add_amplitude(psi):
         @wraps(psi)
@@ -76,22 +81,22 @@ class Beam(object):
         """
         return abs(self.psi(pt))**2
 
-    def RS(self, pt, Rmax, Rmin=0, npRho=501, npPhi=3):
+    def RS(self, pt, r_max, r_min=0, np_rho=501, np_phi=3):
         """ Wave's Raleigh-Sommerfeld integral by 1/3 Simpson's Rule.
 
         Args:
             pt (:obj:'Point'): point at which want to calculate wave's
                 Rayleigh-Sommerfeld complex value.
-            Rmax: aperture radius that will be used to simulate the
+            r_max: aperture radius that will be used to simulate the
                 wave aperture truncate.
-            npRho: rho's variable 1/3 Simpson's Rule discretization.
+            np_rho: rho's variable 1/3 Simpson's Rule discretization.
                 a.k.a: Rho's number points.
-            npPhi: phi's variable 1/3 Simpson's Rule discretization.
+            np_phi: phi's variable 1/3 Simpson's Rule discretization.
                 a.k.a: Phi's number points.
 
         Returns:
             Raleigh-Sommerfeld complex value at a specific point 'pt'
-                given a aperture with radius 'Rmax'.
+                given a aperture with radius 'r_max'.
 
         """
 
@@ -107,18 +112,18 @@ class Beam(object):
                     *E(rho, phi) / R(rho, phi)**2)
 
         # S: 1/3 Simp's rule auxiliary matrix.
-        auxrhovec = [1 if (rho == 0 or rho == npRho - 1) \
-            else (4 if rho % 2 != 0 else 2) for rho in range(npRho)]
+        auxrhovec = [1 if (rho == 0 or rho == np_rho - 1) \
+            else (4 if rho % 2 != 0 else 2) for rho in range(np_rho)]
 
-        auxphivec = [1 if (phi == 0 or phi == npPhi - 1) \
-            else (4 if phi % 2 != 0 else 2) for phi in range(npPhi)]
+        auxphivec = [1 if (phi == 0 or phi == np_phi - 1) \
+            else (4 if phi % 2 != 0 else 2) for phi in range(np_phi)]
 
         S = [[i * j for i in auxrhovec] for j in auxphivec]
 
         # F: 'integrand' mapped at discretized RS points.
-        rhovec = np.linspace(Rmin, Rmax, npRho)
+        rhovec = np.linspace(r_min, r_max, np_rho)
 
-        phivec = np.linspace(0, 2*ma.pi, npPhi)
+        phivec = np.linspace(0, 2*ma.pi, np_phi)
 
         F = [[pt.z*integrand(rho, phi) / (1j*self.wavelength)
               for rho in rhovec]
@@ -128,27 +133,27 @@ class Beam(object):
         H = sum(sum(np.multiply(F, S)))
 
         # Interval's discretization
-        hrho = (Rmax - Rmin) / (npRho-1)
-        hphi = 2*ma.pi / (npPhi-1)
+        hrho = (r_max - r_min) / (np_rho-1)
+        hphi = 2*ma.pi / (np_phi-1)
 
         return hphi*hrho*H/9
 
-    def RSI(self, pt, Rmax, Rmin=0, npRho=501, npPhi=3):
+    def RSI(self, pt, r_max, r_min=0, np_rho=501, np_phi=3):
         """ Wave's Raleigh-Sommerfeld integral intensity.
 
         Args:
             pt (:obj:'Point'): point at which want to calculate wave's
                 Rayleigh-Sommerfeld complex value.
-            Rmax: aperture radius that will be used to simulate the
+            r_max: aperture radius that will be used to simulate the
                 wave aperture truncate.
 
         Returns:
             Raleigh-Sommerfeld intensity value at a specific point 'pt'
-                given a aperture with radius 'Rmax'.
+                given a aperture with radius 'r_max'.
 
         """
 
-        return abs(self.RS(pt, Rmax, Rmin, npRho, npPhi))**2
+        return abs(self.RS(pt, r_max, r_min, np_rho, np_phi))**2
 
     def k0(self, pt):
         """ k0 vector's direction.
@@ -165,7 +170,7 @@ class Beam(object):
         Returns:
             A list containing the normalized k0 vector - [kx, ky, kz]
 
-        """
+        """ 
 
         # Delta
         h = 1e-10
@@ -190,43 +195,63 @@ class Beam(object):
             lambda i: self.psi(Point(pt.x, pt.y, pt.z + i*h)), lsp))
 
         # Psi derivative
-        psi_x = np.dot(fdc, psix) / den
-        psi_y = np.dot(fdc, psiy) / den
-        psi_z = np.dot(fdc, psiz) / den
+        psi_x = np.dot(fdc, psix)/den
+        psi_y = np.dot(fdc, psiy)/den
+        psi_z = np.dot(fdc, psiz)/den
 
         # k0 components
         psi = self.psi(pt)
-        k0x = (psi_x / psi).imag
-        k0y = (psi_y / psi).imag
-        k0z = (psi_z / psi).imag
+        k0x = (psi_x/psi).imag
+        k0y = (psi_y/psi).imag
+        k0z = (psi_z/psi).imag
+
+        if ma.isinf(k0x) is True or ma.isnan(k0x) is True:
+            return [0, 0, 0]
+        if ma.isinf(k0y) is True or ma.isnan(k0y) is True:
+            return [0, 0, 0]
+        if ma.isinf(k0z) is True or ma.isnan(k0z) is True:
+            return [0, 0, 0]
 
         # normalize k0 vector
         if k0x != 0 or k0y != 0 or k0z != 0:
             k = [k0x, k0y, k0z]
-            return k / np.linalg.norm(k)
+            return k/np.linalg.norm(k)
         else:
             return [0, 0, 1]
 
 
 class PlaneWave(Beam):
-    def __init__(self):
+    def __init__(self, **kwargs):
         self.beams = [self]
 
-        self._name = 'plane-wave'
+        self.name = 'plane-wave'
+
         self._amplitude = 1
         self._phase = 0
+        self._beta = pi/4
         self._wavelength = None
         self._k = None
         self._nm = None
 
+        self.params = ('_amplitude',
+                       '_phase',
+                       '_beta',
+                       '_wavelength',
+                       '_k',
+                       '_nm',)
+
+        for key, value in kwargs.items():
+            if hasattr(self, '_' + key):
+                setattr(self, key, value)
+
     def __str__(self):
-        out = ''
-        for p, v in self.__dict__.items():
-            if p[0] == '_':
+        out = 'name: ' + self.name + '\n'
+        for param, value in self.__dict__.items():
+            if param[0] == '_':
                 out += '    '
-                out += p + ': ' + str(v)
+                out += param + ': ' + str(value)
                 out += '\n'
-        return out[:]
+        return out
 
     @property
     def wavelength(self):
@@ -252,7 +277,7 @@ class PlaneWave(Beam):
 
     @property
     def nm(self):
-        return self._k
+        return self._nm
 
     @nm.setter
     def nm(self, value):
@@ -291,15 +316,30 @@ class PlaneWave(Beam):
 
 
 class BesselBeam(PlaneWave):
-    def __init__(self):
+    def __init__(self, **kwargs):
         PlaneWave.__init__(self)
 
-        self._name = 'bessel-beam'
+        self.name = 'bessel-beam'
 
         self._krho = None
         self._kz = None
         self._theta = None
         self._order = 0
+
+        self.params = ('_amplitude',
+                       '_phase',
+                       '_beta',
+                       '_wavelength',
+                       '_k',
+                       '_nm',
+                       '_krho',
+                       '_kz',
+                       '_theta',
+                       '_order',)
+
+        for key, value in kwargs.items():
+            if hasattr(self, '_' + key):
+                setattr(self, key, value)
 
     @property
     def krho(self):
@@ -310,9 +350,9 @@ class BesselBeam(PlaneWave):
         self._krho = value
         self._kz = ma.sqrt(self._k**2 - value**2)
         if self._kz != 0:
-            self._theta = ma.atan(self._krho/self._kz)
+            self.theta = ma.atan(self._krho/self._kz)
         else:
-            self._theta = pi/2
+            self.theta = pi/2
 
     @property
     def kz(self):
@@ -323,9 +363,9 @@ class BesselBeam(PlaneWave):
         self._kz = value
         self._krho = ma.sqrt(self._k**2 - value**2)
         if self._kz != 0:
-            self._theta = ma.atan(self._krho/self._kz)
+            self.theta = ma.atan(self._krho/self._kz)
         else:
-            self._theta = pi/2
+            self.theta = pi/2
 
     @property
     def theta(self):
@@ -354,12 +394,24 @@ class BesselBeam(PlaneWave):
 
 
 class GaussianBeam(PlaneWave):
-    def __init__(self):
+    def __init__(self, **kwargs):
         PlaneWave.__init__(self)
 
-        self._name = 'gaussian-beam'
+        self.name = 'gaussian-beam'
 
         self._q = 1
+
+        self.params = ('_amplitude',
+                       '_phase',
+                       '_beta',
+                       '_wavelength',
+                       '_k',
+                       '_nm',
+                       '_q',)
+
+        for key, value in kwargs.items():
+            if hasattr(self, '_' + key):
+                setattr(self, key, value)
 
     @property
     def q(self):
@@ -379,11 +431,27 @@ class GaussianBeam(PlaneWave):
 
 
 class BesselGaussBeam(BesselBeam, GaussianBeam):
-    def __init__(self):
+    def __init__(self, **kwargs):
         BesselBeam.__init__(self)
         GaussianBeam.__init__(self)
 
-        self._name = 'bessel-gauss-beam'
+        self.name = 'bessel-gauss-beam'
+
+        self.params = ('_amplitude',
+                       '_phase',
+                       '_beta',
+                       '_wavelength',
+                       '_k',
+                       '_nm',
+                       '_krho',
+                       '_kz',
+                       '_theta',
+                       '_order',
+                       '_q',)
+
+        for key, value in kwargs.items():
+            if hasattr(self, '_' + key):
+                setattr(self, key, value)
 
     @Beam.add_phase
     @Beam.add_amplitude
@@ -403,24 +471,42 @@ class BesselGaussBeam(BesselBeam, GaussianBeam):
 
 class BesselGaussBeamSuperposition(BesselGaussBeam):
 
-    def __init__(self):
+    def __init__(self, **kwargs):
         BesselGaussBeam.__init__(self)
 
-        self._name = 'bessel-gauss-beam-superposition'
+        self.name = 'bessel-gauss-beam-superposition'
 
         self.beams = []
 
         self._q = None
         self._N = None
         self._z_max = None
+        self._R = None
+        self._L = None
+        self._qr = None
 
-        self.R_DEFAULT = 1e-3
-        self.L_DEFAULT = 3*self.R_DEFAULT**2
-        self.QR_DEFAULT = 6/self.L_DEFAULT
+        self.params = ('_amplitude',
+                       '_phase',
+                       '_beta',
+                       '_wavelength',
+                       '_k',
+                       '_nm',
+                       '_krho',
+                       '_kz',
+                       '_theta',
+                       '_order',
+                       '_q',
+                       '_N',
+                       '_z_max',
+                       '_R',
+                       '_L',
+                       '_qr',)
 
-        self._R = self.R_DEFAULT
-        self._L = self.L_DEFAULT
-        self._qr = self.QR_DEFAULT
+        for key, value in kwargs.items():
+            if hasattr(self, '_' + key):
+                setattr(self, key, value)
+
+        self.__create_superposition()
 
     def __str__(self):
         out = ''
@@ -439,9 +525,7 @@ class BesselGaussBeamSuperposition(BesselGaussBeam):
     @q.setter
     def q(self, value):
         self._q = value
-
-        if Beam.is_all_parameters_defined(self) is True:
-            self.__create_superposition()
+        self.__create_superposition()
 
     @property
     def N(self):
@@ -450,9 +534,7 @@ class BesselGaussBeamSuperposition(BesselGaussBeam):
     @N.setter
     def N(self, value):
         self._N = value
-
-        if Beam.is_all_parameters_defined(self) is True:
-            self.__create_superposition()
+        self.__create_superposition()
 
     @property
     def z_max(self):
@@ -465,11 +547,10 @@ class BesselGaussBeamSuperposition(BesselGaussBeam):
         if self._theta is None and self._R is not None:
             self.theta = ma.atan(self._R/self._z_max)
 
-        if self._theta is not None and self._R == self.R_DEFAULT:
+        if self._theta is not None and self._R is None:
             self._R = self._z_max*ma.tan(self._theta)
 
-        if Beam.is_all_parameters_defined(self) is True:
-            self.__create_superposition()
+        self.__create_superposition()
 
     @property
     def R(self):
@@ -486,8 +567,7 @@ class BesselGaussBeamSuperposition(BesselGaussBeam):
         if self._theta is not None and self._z_max is None:
             self._z_max = self._R/ma.tan(self._theta)
 
-        if Beam.is_all_parameters_defined(self) is True:
-            self.__create_superposition()
+        self.__create_superposition()
 
     @property
     def theta(self):
@@ -499,14 +579,13 @@ class BesselGaussBeamSuperposition(BesselGaussBeam):
         self._krho = self._k*ma.sin(value)
         self._kz = self._k*ma.cos(value)
 
-        if self._z_max is None:
+        if self._z_max is None and self._R is not None:
             self._z_max = self._R/ma.tan(value)
 
-        if self._z_max is not None and self._R == self.R_DEFAULT:
+        if self._z_max is not None and self._R is None:
             self._R = self._z_max*ma.tan(value)
 
-        if Beam.is_all_parameters_defined(self) is True:
-            self.__create_superposition()
+        self.__create_superposition()
 
     @property
     def L(self):
@@ -516,9 +595,7 @@ class BesselGaussBeamSuperposition(BesselGaussBeam):
     def L(self, value):
         self._L = value
         self.qr = 6/value
-
-        if Beam.is_all_parameters_defined(self) is True:
-            self.__create_superposition()
+        self.__create_superposition()
 
     @property
     def qr(self):
@@ -527,15 +604,18 @@ class BesselGaussBeamSuperposition(BesselGaussBeam):
     @qr.setter
     def qr(self, value):
         self._qr = value
-
-        if Beam.is_all_parameters_defined(self) is True:
-            self.__create_superposition()
+        self.__create_superposition()
 
     def __create_superposition(self):
+        if Beam.is_all_parameters_defined(self) is False:
+            return
+
         def amplitude_n(n):
             arg = (self._qr - self._q - 2j*pi*n/self._L)*self._R**2
             den = self._L*(self._qr-self._q)/2 - 1j*pi*n
             return cm.sinh(arg)/den
+
+        self.beams = []
 
         for i in range(2*self._N + 1):
             n_index = i - self._N
@@ -555,17 +635,35 @@ class BesselGaussBeamSuperposition(BesselGaussBeam):
 
 class FrozenWave(PlaneWave):
 
-    def __init__(self):
+    def __init__(self, **kwargs):
         PlaneWave.__init__(self)
 
-        self._name = 'frozen-wave'
+        self.name = 'frozen-wave'
 
         self.beams = []
 
         self._Q = None
         self._N = None
         self._L = None
-        self._ref_func = None
+        self.func = None
+
+        self.params = ('_amplitude',
+                       '_phase',
+                       '_beta',
+                       '_wavelength',
+                       '_k',
+                       '_nm',
+                       '_theta',
+                       '_order',
+                       '_Q',
+                       '_N',
+                       '_L',)
+
+        for key, value in kwargs.items():
+            if hasattr(self, '_' + key):
+                setattr(self, key, value)
+
+        self.__create_superposition()
 
     def __str__(self):
         out = ''
@@ -586,9 +684,7 @@ class FrozenWave(PlaneWave):
     @Q.setter
     def Q(self, value):
         self._Q = value
-
-        if Beam.is_all_parameters_defined(self) is True:
-            self.__create_superposition()
+        self.__create_superposition()
 
     @property
     def N(self):
@@ -597,9 +693,7 @@ class FrozenWave(PlaneWave):
     @N.setter
     def N(self, value):
         self._N = value
-
-        if Beam.is_all_parameters_defined(self) is True:
-            self.__create_superposition()
+        self.__create_superposition()
 
     @property
     def L(self):
@@ -608,26 +702,26 @@ class FrozenWave(PlaneWave):
     @L.setter
     def L(self, value):
         self._L = value
-
-        if Beam.is_all_parameters_defined(self) is True:
-            self.__create_superposition()
+        self.__create_superposition()
 
     @property
     def ref_func(self):
-        return self._ref_func
+        return self.func
 
     @ref_func.setter
     def ref_func(self, func):
-        self._ref_func = func
-
-        if Beam.is_all_parameters_defined(self) is True:
-            self.__create_superposition()
+        self.func = func
+        self.__create_superposition()
 
     def __create_superposition(self):
+        if (Beam.is_all_parameters_defined(self) is False
+                or self.func is None):
+            return
+
         def amplitude_n(n):
-            func_real = lambda z: (self._ref_func(z)
+            func_real = lambda z: (self.func(z)
                                    * cm.exp(-2j*pi*z*n/self._L)).real
-            func_imag = lambda z: (self._ref_func(z)
+            func_imag = lambda z: (self.func(z)
                                    * cm.exp(-2j*pi*z*n/self._L)).imag
             an_real, err = quad(func_real, 0, self._L)
             an_imag, err = quad(func_imag, 0, self._L)
@@ -651,6 +745,8 @@ class FrozenWave(PlaneWave):
             self._Q = 2*pi*self._N/self._L
             msg += 'to %fk.' % (self._Q/self._k)
             print(msg)
+
+        self.beams = []
 
         for i in range(2*self._N + 1):
             n_index = i - self._N
@@ -745,3 +841,12 @@ class Point:
 
 if __name__ == "__main__":
     print("Please, visit: https://github.com/arantespp/opticalforces")
+
+    b = BesselGaussBeamSuperposition(nm=1, 
+                                     wavelength=1064e-9, 
+                                     q=0,
+                                     N=2)
+
+    b.R = 1e-3
+    b.beta = 2
+    b.krho = 652125
