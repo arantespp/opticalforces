@@ -49,15 +49,15 @@ class Beam(object):
 
     def add_amplitude(psi):
         @wraps(psi)
-        def psi_args(self, pt):
+        def wrapped(self, pt):
             return psi(self, pt)*self._amplitude
-        return psi_args
+        return wrapped
 
     def add_phase(psi):
         @wraps(psi)
-        def psi_args(self, pt):
+        def wrapped(self, pt):
             return psi(self, pt)*cm.exp(1j*self._phase)
-        return psi_args
+        return wrapped
 
     def is_all_parameters_defined(self):
         for param, value in self.__dict__.items():
@@ -171,7 +171,7 @@ class Beam(object):
             A list containing the normalized k0 vector - [kx, ky, kz]
 
         """ 
-
+        return [0, 0, 1]
         # Delta
         h = 1e-10
 
@@ -653,8 +653,7 @@ class FrozenWave(PlaneWave):
                        '_wavelength',
                        '_k',
                        '_nm',
-                       '_theta',
-                       '_order',
+                       #'_order',
                        '_Q',
                        '_N',
                        '_L',)
@@ -674,7 +673,8 @@ class FrozenWave(PlaneWave):
             out += '\n    ' + 'An: ' + str(beam.amplitude)
             out += '\n    ' + 'k: ' + str(beam.k)
             out += '\n    ' + 'kzn: ' + str(beam.kz)
-            out += '\n    ' + 'khron: ' + str(beam.krho) + '\n'
+            out += '\n    ' + 'khron: ' + str(beam.krho)
+            out += '\n    ' + 'thetan: ' + str(beam.theta) + '\n'
         return out
 
     @property
