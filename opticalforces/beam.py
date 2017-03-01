@@ -1,16 +1,33 @@
 import math as ma
 from math import pi
 import cmath as cm
-import numpy as np
+from functools import wraps
 import scipy.special as ss
 from scipy.integrate import quad
-from functools import wraps
+import numpy as np
+
+
+def add_amplitude(psi):
+    @wraps(psi)
+    def wrapped(self, pt):
+        return psi(self, pt)*self.amplitude
+    return wrapped
+
+def add_phase(psi):
+    @wraps(psi)
+    def wrapped(self, pt):
+        return psi(self, pt)*cm.exp(1j*self.phase)
+    return wrapped
+
 
 class Beam(object):
     def __init__(self, beams, name='generic-beam'):
         self.beams = beams
         self.name = name
-        self.params = None
+
+        self._amplitude = 1
+        self._phase = 0
+        self._crossing_angle = pi/4
 
     def __str__(self):
         out = 'name: ' + self.name + '\n'
@@ -40,24 +57,12 @@ class Beam(object):
         self._phase = value
 
     @property
-    def beta(self):
-        return self._beta
+    def crossing_angle(self):
+        return self._crossing_angle
 
-    @beta.setter
-    def beta(self, value):
-        self._beta = value
-
-    def add_amplitude(psi):
-        @wraps(psi)
-        def wrapped(self, pt):
-            return psi(self, pt)*self._amplitude
-        return wrapped
-
-    def add_phase(psi):
-        @wraps(psi)
-        def wrapped(self, pt):
-            return psi(self, pt)*cm.exp(1j*self._phase)
-        return wrapped
+    @crossing_angle.setter
+    def crossing_angle(self, value):
+        self._crossing_angle = value
 
     def is_all_parameters_defined(self):
         for param, value in self.__dict__.items():
@@ -105,7 +110,7 @@ class Beam(object):
             return (pt - Point(rho, phi, 0, 'cilin')).r
 
         def E(rho, phi):
-            return cm.exp(1j*self.k*R(rho, phi))
+            return cm.exp(1j*self.wavenumber*R(rho, phi))
 
         def integrand(rho, phi):
             return (rho*self.psi(Point(rho, phi, 0, 'cilin'))
@@ -168,10 +173,9 @@ class Beam(object):
                 k0 vector's direction.
 
         Returns:
-            A list containing the normalized k0 vector - [kx, ky, kz]
+            A list containing the normalized k0 vector - [kx, ky, longitudinal_wavenumber]
+        """
 
-        """ 
-        return [0, 0, 1]
         # Delta
         h = 1e-10
 
@@ -185,14 +189,9 @@ class Beam(object):
         fdc = [-1, 9, -45, 0, 45, -9, 1]
 
         # Psi calculated over samples points
-        psix = list(map(
-            lambda i: self.psi(Point(pt.x + i*h, pt.y, pt.z)), lsp))
-
-        psiy = list(map(
-            lambda i: self.psi(Point(pt.x, pt.y + i*h, pt.z)), lsp))
-
-        psiz = list(map(
-            lambda i: self.psi(Point(pt.x, pt.y, pt.z + i*h)), lsp))
+        psix = [self.psi(Point(pt.x + i*h, pt.y, pt.z)) for i in lsp]
+        psiy = [self.psi(Point(pt.x, pt.y + i*h, pt.z)) for i in lsp]
+        psiz = [self.psi(Point(pt.x, pt.y, pt.z + i*h)) for i in lsp]
 
         # Psi derivative
         psi_x = np.dot(fdc, psix)/den
@@ -221,24 +220,27 @@ class Beam(object):
 
 
 class PlaneWave(Beam):
+    params = ('_amplitude',
+              '_phase',
+              '_crossing_angle',
+              '_vacuum_wavelength',
+              '_vacuum_wavenumber',
+              '_medium_refractive_index',
+              '_wavelength',
+              '_wavenumber',)
+
     def __init__(self, **kwargs):
+        Beam.__init__(self)
+
         self.beams = [self]
 
         self.name = 'plane-wave'
 
-        self._amplitude = 1
-        self._phase = 0
-        self._beta = pi/4
+        self._vacuum_wavelength = None
+        self._vacuum_wavenumber = None
+        self._medium_refractive_index = None
         self._wavelength = None
-        self._k = None
-        self._nm = None
-
-        self.params = ('_amplitude',
-                       '_phase',
-                       '_beta',
-                       '_wavelength',
-                       '_k',
-                       '_nm',)
+        self._wavenumber = None
 
         for key, value in kwargs.items():
             if hasattr(self, '_' + key):
@@ -246,60 +248,122 @@ class PlaneWave(Beam):
 
     def __str__(self):
         out = 'name: ' + self.name + '\n'
-        for param, value in self.__dict__.items():
-            if param[0] == '_':
-                out += '    '
-                out += param + ': ' + str(value)
-                out += '\n'
+        for param in self.params:
+            out += '    '
+            out += param + ': ' + str(self.__dict__[param])
+            out += '\n'
         return out
+
+    # ----- vacuum -----
+
+    @property
+    def vacuum_wavelength(self):
+        return self._vacuum_wavelength
+
+    @vacuum_wavelength.setter
+    def vacuum_wavelength(self, wl0):
+        self._vacuum_wavelength = wl0
+
+        if self.vacuum_wavenumber is None:
+            self.vacuum_wavenumber = 2*pi/wl0
+
+        if (self.medium_refractive_index is not None
+                and self.wavelength is None):
+            self.wavelength = wl0/self.medium_refractive_index
+
+        if (self.medium_refractive_index is None
+                and self.wavenumber is not None):
+            self.medium_refractive_index = wl0*self.wavelength/(2*pi)
+
+    @property
+    def vacuum_wavenumber(self):
+        return self._vacuum_wavenumber
+
+    @vacuum_wavenumber.setter
+    def vacuum_wavenumber(self, k0):
+        self._vacuum_wavenumber = k0
+
+        if self.vacuum_wavelength is None:
+            self.vacuum_wavelength = 2*pi/k0
+
+        if (self.medium_refractive_index is not None
+                and self.wavenumber is None):
+            self.wavenumber = k0*self.medium_refractive_index
+
+        if (self.medium_refractive_index is None
+                and self.wavelength is not None):
+            self.medium_refractive_index = 2*pi/(k0*self.wavelength)
+
+    # ----- medium -----
 
     @property
     def wavelength(self):
         return self._wavelength
 
     @wavelength.setter
-    def wavelength(self, value):
-        self._wavelength = value
-        #self.__set_wavelength()
-        self.__set_k()
-        self.__set_nm()
+    def wavelength(self, wl):
+        self._wavelength = wl
+
+        if self.wavenumber is None:
+            self.wavenumber = 2*pi/wl
+
+        if (self.medium_refractive_index is not None
+                and self.vacuum_wavelength is None):
+            self.vacuum_wavelength = wl*self.medium_refractive_index
+
+        if (self.medium_refractive_index is None
+                and self.vacuum_wavenumber is not None):
+            self.medium_refractive_index = 2*pi/(wl*self.vacuum_wavenumber)
 
     @property
-    def k(self):
-        return self._k
+    def wavenumber(self):
+        return self._wavenumber
 
-    @k.setter
-    def k(self, value):
-        self._k = value
-        self.__set_wavelength()
-        #self.__set_k()
-        self.__set_nm()
+    @wavenumber.setter
+    def wavenumber(self, k):
+        self._wavenumber = k
+
+        if self.wavelength is None:
+            self.wavelength = 2*pi/k
+
+        if (self.medium_refractive_index is not None
+                and self.vacuum_wavenumber is None):
+            self.vacuum_wavenumber = k/self.medium_refractive_index
+
+        if (self.medium_refractive_index is None
+                and self.vacuum_wavelength is not None):
+            self.medium_refractive_index = (k*self.vacuum_wavelength
+                                            / (2*pi))
+
+    # ----- medium refractive index -----
 
     @property
-    def nm(self):
-        return self._nm
+    def medium_refractive_index(self):
+        return self._medium_refractive_index
 
-    @nm.setter
-    def nm(self, value):
-        self._nm = value
-        self.__set_wavelength()
-        self.__set_k()
-        #self.__set_nm()
+    @medium_refractive_index.setter
+    def medium_refractive_index(self, nm):
+        self._medium_refractive_index = nm
 
-    def __set_wavelength(self):
-        if self._k is not None and self._nm is not None:
-            self._wavelength = self._nm*2*pi/self.k
+        if (self.vacuum_wavelength is None
+                and self.wavelength is not None):
+            self.vacuum_wavelength = self.wavelength*nm
 
-    def __set_k(self):
-        if self._wavelength is not None and self._nm is not None:
-            self._k = self._nm*2*pi/self.wavelength
+        if (self.vacuum_wavelength is not None
+                and self.wavelength is None):
+            self.wavelength = self.vacuum_wavelength/nm
 
-    def __set_nm(self):
-        if self._wavelength is not None and self._k is not None:
-            self._nm = self.wavelength*self._k/(2*pi)
+        if (self.vacuum_wavenumber is None
+                and self.wavenumber is not None):
+            self.vacuum_wavenumber = self.wavenumber/nm
 
-    @Beam.add_phase
-    @Beam.add_amplitude
+        if (self.vacuum_wavenumber is not None
+                and self.wavenumber is None):
+            self.wavenumber = self.vacuum_wavenumber*nm
+
+
+    @add_phase
+    @add_amplitude
     def psi(self, pt):
         """ Wave's equation 'psi'.
 
@@ -312,164 +376,228 @@ class PlaneWave(Beam):
                 red on beam class.
 
         """
-        return cm.exp(1j*self.k*pt.z)
+        return cm.exp(1j*self._wavenumber*pt.z)
 
 
 class BesselBeam(PlaneWave):
+    params = PlaneWave.params
+    params += ('_longitudinal_wavenumber',
+               '_transversal_wavenumber',
+               '_axicon_angle',
+               '_bessel_order',)
+
     def __init__(self, **kwargs):
         PlaneWave.__init__(self)
 
         self.name = 'bessel-beam'
 
-        self._krho = None
-        self._kz = None
-        self._theta = None
-        self._order = 0
-
-        self.params = ('_amplitude',
-                       '_phase',
-                       '_beta',
-                       '_wavelength',
-                       '_k',
-                       '_nm',
-                       '_krho',
-                       '_kz',
-                       '_theta',
-                       '_order',)
+        self._transversal_wavenumber = None
+        self._longitudinal_wavenumber = None
+        self._axicon_angle = None
+        self._bessel_order = 0
 
         for key, value in kwargs.items():
             if hasattr(self, '_' + key):
                 setattr(self, key, value)
 
     @property
-    def krho(self):
-        return self._krho
+    def wavenumber(self):
+        return self._wavenumber
 
-    @krho.setter
-    def krho(self, value):
-        self._krho = value
-        self._kz = ma.sqrt(self._k**2 - value**2)
-        if self._kz != 0:
-            self.theta = ma.atan(self._krho/self._kz)
-        else:
-            self.theta = pi/2
+    @wavenumber.setter
+    def wavenumber(self, k):
+        self._wavenumber = k
+
+        if self.wavelength is None:
+            self.wavelength = 2*pi/k
+
+        if (self.medium_refractive_index is not None
+                and self.vacuum_wavenumber is None):
+            self.vacuum_wavenumber = k/self.medium_refractive_index
+
+        if (self.medium_refractive_index is None
+                and self.vacuum_wavelength is not None):
+            self.medium_refractive_index = (k*self.vacuum_wavelength
+                                            / (2*pi))
+
+        if self.longitudinal_wavenumber is not None:
+            kz = self.longitudinal_wavenumber
+
+            if self.transversal_wavenumber is None:
+                self.transversal_wavenumber = ma.sqrt(k**2 - kz**2)
+
+            if self.axicon_angle is None:
+                self.axicon_angle = ma.acos(kz/k)
+
+        if self.transversal_wavenumber is not None:
+            krho = self.transversal_wavenumber
+
+            if self.longitudinal_wavenumber is None:
+                self.longitudinal_wavenumber = ma.sqrt(k**2 - krho**2)
+
+            if self.axicon_angle is None:
+                self.axicon_angle = ma.asin(krho/k)
+
+        if self.axicon_angle is not None:
+            theta = self.axicon_angle
+
+            if self.longitudinal_wavenumber is None:
+                self.longitudinal_wavenumber = k*ma.cos(theta)
+
+            if self.transversal_wavenumber is None:
+                self.transversal_wavenumber = k.ma.sin(theta)
 
     @property
-    def kz(self):
-        return self._kz
+    def longitudinal_wavenumber(self):
+        return self._longitudinal_wavenumber
 
-    @kz.setter
-    def kz(self, value):
-        self._kz = value
-        self._krho = ma.sqrt(self._k**2 - value**2)
-        if self._kz != 0:
-            self.theta = ma.atan(self._krho/self._kz)
-        else:
-            self.theta = pi/2
+    @longitudinal_wavenumber.setter
+    def longitudinal_wavenumber(self, kz):
+        self._longitudinal_wavenumber = kz
 
-    @property
-    def theta(self):
-        return self._theta
+        if self.transversal_wavenumber is not None:
+            krho = self.transversal_wavenumber
+            self.wavenumber = ma.sqrt(kz**2 + krho**2)
 
-    @theta.setter
-    def theta(self, value):
-        self._theta = value
-        self._krho = self._k*ma.sin(value)
-        self._kz = self._k*ma.cos(value)
+        if self.axicon_angle is not None:
+            theta = self.axicon_angle
+            if theta != pi/2:
+                self.wavenumber = kz/ma.cos(theta)
+
+        if self.wavenumber is not None:
+            self.wavenumber = self.wavenumber
+
 
     @property
-    def order(self):
-        return self._order
+    def transversal_wavenumber(self):
+        return self._transversal_wavenumber
 
-    @order.setter
-    def order(self, value):
-        self._order = value
+    @transversal_wavenumber.setter
+    def transversal_wavenumber(self, krho):
+        self._transversal_wavenumber = krho
 
-    @Beam.add_phase
-    @Beam.add_amplitude
+        if self.longitudinal_wavenumber is not None:
+            kz = self.longitudinal_wavenumber
+            self.wavenumber = ma.sqrt(kz**2 + krho**2)
+
+        if self.axicon_angle is not None:
+            theta = self.axicon_angle
+            if theta != 0:
+                self.wavenumber = krho/ma.sin(theta)
+
+        if self.wavenumber is not None:
+            self.wavenumber = self.wavenumber
+
+    @property
+    def axicon_angle(self):
+        return self._axicon_angle
+
+    @axicon_angle.setter
+    def axicon_angle(self, theta):
+        self._axicon_angle = theta
+
+        if self.longitudinal_wavenumber is not None:
+            kz = self.longitudinal_wavenumber
+            if theta != pi/2:
+                self.wavenumber = kz/ma.cos(theta)
+
+        if self.transversal_wavenumber is not None:
+            krho = self.transversal_wavenumber
+            if theta != 0:
+                self.wavenumber = krho/ma.sin(theta)
+
+        if self.wavenumber is not None:
+            self.wavenumber = self.wavenumber
+
+    @property
+    def bessel_order(self):
+        return self._bessel_order
+
+    @bessel_order.setter
+    def bessel_order(self, value):
+        self._bessel_order = value
+
+    @add_phase
+    @add_amplitude
     def psi(self, pt):
-        return (ss.jv(self._order, self._krho*pt.rho)
-                * cm.exp(1j*self._kz*pt.z)
-                * cm.exp(1j*self._order*pt.phi))
+        return (ss.jv(self._bessel_order, self._transversal_wavenumber*pt.rho)
+                * cm.exp(1j*self._longitudinal_wavenumber*pt.z)
+                * cm.exp(1j*self._bessel_order*pt.phi))
 
 
 class GaussianBeam(PlaneWave):
+    params = PlaneWave.params
+    params += ('_q_constant',)
+
     def __init__(self, **kwargs):
         PlaneWave.__init__(self)
 
         self.name = 'gaussian-beam'
 
-        self._q = 1
-
-        self.params = ('_amplitude',
-                       '_phase',
-                       '_beta',
-                       '_wavelength',
-                       '_k',
-                       '_nm',
-                       '_q',)
+        self._q_constant = 1
 
         for key, value in kwargs.items():
             if hasattr(self, '_' + key):
                 setattr(self, key, value)
 
     @property
-    def q(self):
-        return self._q
+    def q_constant(self):
+        return self._q_constant
 
-    @q.setter
-    def q(self, value):
-        self._q = value
+    @q_constant.setter
+    def q_constant(self, q):
+        self._q_constant = q
 
-    @Beam.add_phase
-    @Beam.add_amplitude
+    @add_phase
+    @add_amplitude
     def psi(self, pt):
-        return ((1/(1+1j*pt.z*2*self._q/self._k))
-                * cm.exp(1j*pt.z*self._k)
-                * cm.exp((-self._q*pt.rho**2)
-                         / (1 + 1j*pt.z*2*self._q / self._k)))
+        k = self.wavenumber
+        q = self.q_constant
+        return ((1/(1 + 1j*pt.z*2*q/k))
+                * cm.exp(1j*pt.z*k)
+                * cm.exp((-q*pt.rho**2)/(1+1j*pt.z*2*q/k)))
 
 
 class BesselGaussBeam(BesselBeam, GaussianBeam):
+    params = BesselBeam.params
+    params += ('_q_constant',)
+
     def __init__(self, **kwargs):
         BesselBeam.__init__(self)
         GaussianBeam.__init__(self)
 
         self.name = 'bessel-gauss-beam'
 
-        self.params = ('_amplitude',
-                       '_phase',
-                       '_beta',
-                       '_wavelength',
-                       '_k',
-                       '_nm',
-                       '_krho',
-                       '_kz',
-                       '_theta',
-                       '_order',
-                       '_q',)
-
         for key, value in kwargs.items():
             if hasattr(self, '_' + key):
                 setattr(self, key, value)
 
-    @Beam.add_phase
-    @Beam.add_amplitude
+    @add_phase
+    @add_amplitude
     def psi(self, pt):
+        q = self.q_constant
+        k = self.wavenumber
+        krho = self.transversal_wavenumber
+
         if pt.z != 0:
-            Q = self._q - 1j*self._k/(2*pt.z)
-            num = 1j*self._k/(2*pt.z*Q)
-            exp1 = cm.exp(1j*self._k*(pt.z+pt.rho**2/(2*pt.z)))
-            bessel = ss.jv(0, num*self._krho*pt.rho)
-            exp2 = cm.exp((self._krho**2+self._k**2*pt.rho**2/pt.z**2)
+            Q = q - 1j*k/(2*pt.z)
+            num = 1j*k/(2*pt.z*Q)
+            exp1 = cm.exp(1j*k*(pt.z+pt.rho**2/(2*pt.z)))
+            bessel = ss.jv(0, num*krho*pt.rho)
+            exp2 = cm.exp((krho**2 + k**2*pt.rho**2/pt.z**2)
                           * (-1/(4*Q)))
             return -num*exp1*bessel*exp2
         else:
-            return (ss.jv(0, self._krho*pt.rho)
-                    * cm.exp(-self._q*pt.rho**2))
+            return ss.jv(0, krho*pt.rho)*cm.exp(-q*pt.rho**2)
 
 
 class BesselGaussBeamSuperposition(BesselGaussBeam):
+    params = BesselGaussBeam.params
+    params += ('_N',
+               '_z_max',
+               '_aperture_radius',
+               '_L_constant',
+               '_q_constant_real')
 
     def __init__(self, **kwargs):
         BesselGaussBeam.__init__(self)
@@ -478,29 +606,12 @@ class BesselGaussBeamSuperposition(BesselGaussBeam):
 
         self.beams = []
 
-        self._q = None
+        self._q_constant = None
         self._N = None
         self._z_max = None
-        self._R = None
-        self._L = None
-        self._qr = None
-
-        self.params = ('_amplitude',
-                       '_phase',
-                       '_beta',
-                       '_wavelength',
-                       '_k',
-                       '_nm',
-                       '_krho',
-                       '_kz',
-                       '_theta',
-                       '_order',
-                       '_q',
-                       '_N',
-                       '_z_max',
-                       '_R',
-                       '_L',
-                       '_qr',)
+        self._aperture_radius = None
+        self._L_constant = None
+        self._q_constant_real = None
 
         for key, value in kwargs.items():
             if hasattr(self, '_' + key):
@@ -514,17 +625,18 @@ class BesselGaussBeamSuperposition(BesselGaussBeam):
         for i, beam in enumerate(self.beams):
             out += ('\n' + 'beam %d (n: %d)' %(i+1,
                                                i-len(self.beams)//2))
-            out += '\n    ' + 'An: ' + str(beam.amplitude)
-            out += '\n    ' + 'qn: ' + str(beam.q) + '\n'
+            out += '\n    ' + '_amplitude: ' + str(beam.amplitude)
+            out += '\n    ' + '_q_constant: ' + str(beam.q_constant)
+            out += '\n'
         return out
 
     @property
-    def q(self):
-        return self._q
+    def q_constant(self):
+        return self._q_constant
 
-    @q.setter
-    def q(self, value):
-        self._q = value
+    @q_constant.setter
+    def q_constant(self, q):
+        self._q_constant = q
         self.__create_superposition()
 
     @property
@@ -532,8 +644,8 @@ class BesselGaussBeamSuperposition(BesselGaussBeam):
         return self._N
 
     @N.setter
-    def N(self, value):
-        self._N = value
+    def N(self, N):
+        self._N = N
         self.__create_superposition()
 
     @property
@@ -543,67 +655,80 @@ class BesselGaussBeamSuperposition(BesselGaussBeam):
     @z_max.setter
     def z_max(self, value):
         self._z_max = value
-
-        if self._theta is None and self._R is not None:
-            self.theta = ma.atan(self._R/self._z_max)
-
-        if self._theta is not None and self._R is None:
-            self._R = self._z_max*ma.tan(self._theta)
-
-        self.__create_superposition()
-
-    @property
-    def R(self):
-        return self._R
-
-    @R.setter
-    def R(self, value):
-        self._R = value
-        self.L = 3*value**2
-
-        if self._theta is None and self._z_max is not None:
-            self.theta = ma.atan(self._R/self._z_max)
-
-        if self._theta is not None and self._z_max is None:
-            self._z_max = self._R/ma.tan(self._theta)
+        if (self.axicon_angle is None
+                and self._aperture_radius is not None):
+            self.axicon_angle = ma.atan(self._aperture_radius
+                                        /self._z_max)
+        if (self._axicon_angle is not None
+                and self._aperture_radius is None):
+            self._aperture_radius = (self._z_max
+                                     *ma.tan(self._axicon_angle))
 
         self.__create_superposition()
 
     @property
-    def theta(self):
-        return self._theta
+    def aperture_radius(self):
+        return self._aperture_radius
 
-    @theta.setter
-    def theta(self, value):
-        self._theta = value
-        self._krho = self._k*ma.sin(value)
-        self._kz = self._k*ma.cos(value)
+    @aperture_radius.setter
+    def aperture_radius(self, value):
+        self._aperture_radius = value
+        self.L_constant = 3*value**2
 
-        if self._z_max is None and self._R is not None:
-            self._z_max = self._R/ma.tan(value)
+        if self.axicon_angle is None and self.z_max is not None:
+            self.axicon_angle = ma.atan(value/self._z_max)
 
-        if self._z_max is not None and self._R is None:
-            self._R = self._z_max*ma.tan(value)
+        if self.axicon_angle is not None and self._z_max is None:
+            self.z_max = value/ma.tan(self._axicon_angle)
 
         self.__create_superposition()
 
     @property
-    def L(self):
-        return self._L
+    def axicon_angle(self):
+        return self._axicon_angle
 
-    @L.setter
-    def L(self, value):
-        self._L = value
-        self.qr = 6/value
+    @axicon_angle.setter
+    def axicon_angle(self, theta):
+        self._axicon_angle = theta
+
+        if self.longitudinal_wavenumber is not None:
+            kz = self.longitudinal_wavenumber
+            if theta != pi/2:
+                self.wavenumber = kz/ma.cos(theta)
+
+        if self.transversal_wavenumber is not None:
+            krho = self.transversal_wavenumber
+            if theta != 0:
+                self.wavenumber = krho/ma.sin(theta)
+
+        if self.z_max is None and self.aperture_radius is not None:
+            self.z_max = self.aperture_radius/ma.tan(theta)
+
+        if self.z_max is not None and self.aperture_radius is None:
+            self.aperture_radius = self.z_max*ma.tan(theta)
+
+        if self.wavenumber is not None:
+            self.wavenumber = self.wavenumber
+
         self.__create_superposition()
 
     @property
-    def qr(self):
-        return self._qr
+    def L_constant(self):
+        return self._L_constant
 
-    @qr.setter
-    def qr(self, value):
-        self._qr = value
+    @L_constant.setter
+    def L_constant(self, L):
+        self._L_constant = L
+        self.q_constant_real = 6/L
+        self.__create_superposition()
+
+    @property
+    def q_constant_real(self):
+        return self._q_constant_real
+
+    @q_constant_real.setter
+    def q_constant_real(self, qr):
+        self._q_constant_real = qr
         self.__create_superposition()
 
     def __create_superposition(self):
@@ -611,29 +736,39 @@ class BesselGaussBeamSuperposition(BesselGaussBeam):
             return
 
         def amplitude_n(n):
-            arg = (self._qr - self._q - 2j*pi*n/self._L)*self._R**2
-            den = self._L*(self._qr-self._q)/2 - 1j*pi*n
+            qr = self.q_constant_real
+            q = self.q_constant
+            L = self.L_constant
+            R = self.aperture_radius
+
+            arg = (qr - q - 2j*pi*n/L)*R**2
+            den = L*(qr-q)/2 - 1j*pi*n
             return cm.sinh(arg)/den
 
         self.beams = []
 
-        for i in range(2*self._N + 1):
-            n_index = i - self._N
+        for i in range(2*self.N + 1):
+            n_index = i - self.N
             beam = BesselGaussBeam()
             beam.amplitude = amplitude_n(n_index)
             beam.wavelength = self._wavelength
-            beam.nm = self._nm
-            beam.krho = self._krho
-            beam.q = self._qr - 1j*2*pi*n_index/self._L
+            beam.medium_refractive_index = self.medium_refractive_index
+            beam.transversal_wavenumber = self.transversal_wavenumber
+            beam.q_constant = (self.q_constant_real
+                               - 1j*2*pi*n_index/self.L_constant)
             self.beams.append(beam)
 
-    @Beam.add_phase
-    @Beam.add_amplitude
+    @add_phase
+    @add_amplitude
     def psi(self, pt):
         return sum([beam.psi(pt) for beam in self.beams])
 
 
 class FrozenWave(PlaneWave):
+    params = PlaneWave.params
+    params += ('_Q',
+               '_N',
+               '_L',)
 
     def __init__(self, **kwargs):
         PlaneWave.__init__(self)
@@ -645,18 +780,8 @@ class FrozenWave(PlaneWave):
         self._Q = None
         self._N = None
         self._L = None
+        self.z_max = None
         self.func = None
-
-        self.params = ('_amplitude',
-                       '_phase',
-                       '_beta',
-                       '_wavelength',
-                       '_k',
-                       '_nm',
-                       #'_order',
-                       '_Q',
-                       '_N',
-                       '_L',)
 
         for key, value in kwargs.items():
             if hasattr(self, '_' + key):
@@ -671,10 +796,10 @@ class FrozenWave(PlaneWave):
             out += ('\n' + 'beam %d (n: %d)' %(i+1,
                                                i-len(self.beams)//2))
             out += '\n    ' + 'An: ' + str(beam.amplitude)
-            out += '\n    ' + 'k: ' + str(beam.k)
-            out += '\n    ' + 'kzn: ' + str(beam.kz)
-            out += '\n    ' + 'khron: ' + str(beam.krho)
-            out += '\n    ' + 'thetan: ' + str(beam.theta) + '\n'
+            out += '\n    ' + 'k: ' + str(beam.wavenumber)
+            out += '\n    ' + 'longitudinal_wavenumbern: ' + str(beam.longitudinal_wavenumber)
+            out += '\n    ' + 'khron: ' + str(beam.transversal_wavenumber)
+            out += '\n    ' + 'axicon_anglen: ' + str(beam.axicon_angle) + '\n'
         return out
 
     @property
@@ -702,14 +827,15 @@ class FrozenWave(PlaneWave):
     @L.setter
     def L(self, value):
         self._L = value
+        self.z_max = value
         self.__create_superposition()
 
     @property
-    def ref_func(self):
+    def reference_function(self):
         return self.func
 
-    @ref_func.setter
-    def ref_func(self, func):
+    @reference_function.setter
+    def reference_function(self, func):
         self.func = func
         self.__create_superposition()
 
@@ -720,50 +846,50 @@ class FrozenWave(PlaneWave):
 
         def amplitude_n(n):
             func_real = lambda z: (self.func(z)
-                                   * cm.exp(-2j*pi*z*n/self._L)).real
+                                   * cm.exp(-2j*pi*z*n/self.L)).real
             func_imag = lambda z: (self.func(z)
-                                   * cm.exp(-2j*pi*z*n/self._L)).imag
-            an_real, err = quad(func_real, 0, self._L)
-            an_imag, err = quad(func_imag, 0, self._L)
-            return (an_real + 1j*an_imag)/self._L
+                                   * cm.exp(-2j*pi*z*n/self.L)).imag
+            an_real, err = quad(func_real, 0, self.L)
+            an_imag, err = quad(func_imag, 0, self.L)
+            return (an_real + 1j*an_imag)/self.L
 
-        if 2*pi*self._N/self._L > self._k/2:
+        if 2*pi*self.N/self.L > self.wavenumber/2:
             error_msg = 'Combination of N, L and k does not '
             error_msg += 'satisfy Q range condition.'
             raise NameError(error_msg)
 
-        if self._Q + 2*pi*self._N/self._L > self._k:
+        if self.Q + 2*pi*self.N/self.L > self.wavenumber:
             msg = 'Q is too large. '
-            msg += 'It was changed from %fk ' % (self._Q/self._k)
-            self._Q = self._k - 2*pi*self._N/self._L
-            msg += 'to %fk.' % (self._Q/self._k)
+            msg += 'It was changed from %fk '%(self.Q/self.wavenumber)
+            self.Q = self.wavenumber - 2*pi*self.N/self.L
+            msg += 'to %fk.' % (self.Q/self.wavenumber)
             print(msg)
 
-        if self._Q - 2*pi*self._N/self._L < 0:
+        if self.Q - 2*pi*self.N/self.L < 0:
             msg = 'Q is too low. '
-            msg += 'It was changed from %fk ' % (self._Q/self._k)
-            self._Q = 2*pi*self._N/self._L
-            msg += 'to %fk.' % (self._Q/self._k)
+            msg += 'It was changed from %fk '%(self.Q/self.wavenumber)
+            self.Q = 2*pi*self.N/self.L
+            msg += 'to %fk.' % (self.Q/self.wavenumber)
             print(msg)
 
         self.beams = []
 
-        for i in range(2*self._N + 1):
-            n_index = i - self._N
+        for i in range(2*self.N + 1):
+            n_index = i - self.N
             beam = BesselBeam()
             beam.amplitude = amplitude_n(n_index)
-            beam.wavelength = self._wavelength
-            beam.nm = self._nm
-            beam.kz = self._Q + 2*pi*n_index/self._L
+            beam.wavelength = self.wavelength
+            beam.medium_refractive_index = self.medium_refractive_index
+            beam.longitudinal_wavenumber = self.Q + 2*pi*n_index/self.L
             self.beams.append(beam)
 
-    @Beam.add_phase
-    @Beam.add_amplitude
+    @add_phase
+    @add_amplitude
     def psi(self, pt):
         return sum([beam.psi(pt) for beam in self.beams])
 
 
-class Point:
+class Point(object):
     def __init__(self, v1, v2, v3, system='cart'):
         if system == 'cart':
             self.__init(v1, v2, v3)
@@ -804,7 +930,7 @@ class Point:
                 + "Cilin = (%s, %s, %s)."
                 % (str(self.rho), str(self.phi), str(self.z)) + '\n'
                 + "Spher = (%s, %s, %s)."
-                % (str(self.r), str(self.theta), str(self.phi)))
+                % (str(self.r), str(self.axicon_angle), str(self.phi)))
 
     def __init(self, x, y, z):
         # cartesian
@@ -829,9 +955,9 @@ class Point:
         # spherical
         self.r = ma.sqrt(x**2 + y**2 + z**2)
         if self.r != 0:
-            self.theta = ma.acos(z / self.r)
+            self.axicon_angle = ma.acos(z / self.r)
         else:
-            self.theta = 0.0
+            self.axicon_angle = 0.0
 
     def abs(self):
         return self.r
@@ -839,14 +965,6 @@ class Point:
     def normalize(self):
         return [self.x/self.r, self.y/self.r, self.z/self.r]
 
+
 if __name__ == "__main__":
     print("Please, visit: https://github.com/arantespp/opticalforces")
-
-    b = BesselGaussBeamSuperposition(nm=1, 
-                                     wavelength=1064e-9, 
-                                     q=0,
-                                     N=2)
-
-    b.R = 1e-3
-    b.beta = 2
-    b.krho = 652125
