@@ -230,7 +230,7 @@ class PlaneWave(Beam):
               '_wavenumber',)
 
     def __init__(self, **kwargs):
-        Beam.__init__(self)
+        Beam.__init__(self, self)
 
         self.beams = [self]
 
@@ -586,6 +586,8 @@ class BesselGaussBeam(BesselBeam, GaussianBeam):
             bessel = ss.jv(0, num*krho*pt.rho)
             exp2 = cm.exp((krho**2 + k**2*pt.rho**2/pt.z**2)
                           * (-1/(4*Q)))
+            if ma.isinf(bessel.real) is True:
+                return ss.jv(0, krho*pt.rho)*cm.exp(-q*pt.rho**2)
             return -num*exp1*bessel*exp2
         else:
             return ss.jv(0, krho*pt.rho)*cm.exp(-q*pt.rho**2)
@@ -795,11 +797,16 @@ class FrozenWave(PlaneWave):
         for i, beam in enumerate(self.beams):
             out += ('\n' + 'beam %d (n: %d)' %(i+1,
                                                i-len(self.beams)//2))
-            out += '\n    ' + 'An: ' + str(beam.amplitude)
-            out += '\n    ' + 'k: ' + str(beam.wavenumber)
-            out += '\n    ' + 'longitudinal_wavenumbern: ' + str(beam.longitudinal_wavenumber)
-            out += '\n    ' + 'khron: ' + str(beam.transversal_wavenumber)
-            out += '\n    ' + 'axicon_anglen: ' + str(beam.axicon_angle) + '\n'
+            out += '\n    ' + 'amplitude: ' 
+            out += str(beam.amplitude)
+            out += '\n    ' + 'longitudinal_wavenumber: ' 
+            out += str(beam.longitudinal_wavenumber)
+            out += '\n    ' + 'transversal_wavenumber: ' 
+            out += str(beam.transversal_wavenumber)
+            out += '\n    ' + 'axicon_angle: ' 
+            out += str(beam.axicon_angle) + ' rad / '
+            out += str(beam.axicon_angle*180/pi)  + ' degrees'
+            out += '\n'
         return out
 
     @property
