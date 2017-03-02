@@ -1,12 +1,16 @@
+import math as ma
+from math import pi
+import cmath as cm
 from numbers import Number
 from scipy.integrate import dblquad
 from astropy.table import Table
+import numpy as np
 
-from beam import *
+from beam import Point
 
 
 # Speed of light.
-c = 299792458
+speed_of_light = 299792458
 
 def round_sig(num, sig=4):
     if num < 0:
@@ -123,16 +127,16 @@ def save_database(regime):
 
 
 class SphericalParticle(object):
-    def __init__(self, **kwargs):
-        self._Rp = None
-        self._np = None
-        self._nm = None
-        self._alphap = 0
+    params = ('_radius',
+              '_refractive_index',
+              '_medium_refractive_index',
+              '_absorption_coefficient',)
 
-        self.params = ('_Rp',
-                       '_np',
-                       '_nm',
-                       '_alphap',)
+    def __init__(self, **kwargs):
+        self._radius = None
+        self._refractive_index = None
+        self._medium_refractive_index = None
+        self._absorption_coefficient = 0
 
         for key, value in kwargs.items():
             if hasattr(self, '_' + key):
@@ -140,73 +144,80 @@ class SphericalParticle(object):
 
     def __str__(self):
         out = 'Particle parameters: \n'
-        for param, value in self.__dict__.items():
-            if param[0] == '_':
-                out += '    '
-                out += param + ': ' + str(value) + '\n'
+        for param in self.params:
+            out += '    '
+            out += param + ': ' + str(self.__dict__[param]) + '\n'
         return out
 
     @property
-    def Rp(self):
-        return self._Rp
+    def radius(self):
+        return self._radius
 
-    @Rp.setter
-    def Rp(self, value):
-        self._Rp = value
-
-    @property
-    def np(self):
-        return self._np
-
-    @np.setter
-    def np(self, value):
-        self._np = value
+    @radius.setter
+    def radius(self, value):
+        self._radius = value
 
     @property
-    def nm(self):
-        return self._nm
+    def refractive_index(self):
+        return self._refractive_index
 
-    @nm.setter
-    def nm(self, value):
-        self._nm = value
+    @refractive_index.setter
+    def refractive_index(self, value):
+        self._refractive_index = value
 
     @property
-    def alphap(self):
-        return self._alphap
+    def medium_refractive_index(self):
+        return self._medium_refractive_index
 
-    @alphap.setter
-    def alphap(self, value):
-        self._alphap = value
+    @medium_refractive_index.setter
+    def medium_refractive_index(self, value):
+        self._medium_refractive_index = value
+
+    @property
+    def absorption_coefficient(self):
+        return self._absorption_coefficient
+
+    @absorption_coefficient.setter
+    def absorption_coefficient(self, value):
+        self._absorption_coefficient = value
 
     # Vector normal to surface point where a single ray hits.
     @staticmethod
     def n0(theta, phi):
-        return [ma.sin(theta) * ma.cos(phi),
-                ma.sin(theta) * ma.sin(phi),
-                ma.cos(theta)]
+        if theta == 0:
+            return [0, 0, 1]
+        elif theta == pi:
+            return [0, 0, -1]
+        else:
+            return [ma.sin(theta)*ma.cos(phi),
+                    ma.sin(theta)*ma.sin(phi),
+                    ma.cos(theta)]
 
     @classmethod
-    def incident_angle(cls, k0, theta, phi):
+    def incident_angle(cls, incident_ray, theta, phi):
+        k0 = incident_ray
         n0 = cls.n0(theta, phi)
         if np.linalg.norm(k0) != 0:
             k0 /= np.linalg.norm(k0)
         return ma.acos(-np.dot(k0, n0))
 
     @classmethod
-    def d0(cls, k0, theta, phi):
+    def d0(cls, incident_ray, theta, phi):
+        k0 = incident_ray
         n0 = cls.n0(theta, phi)
         if np.linalg.norm(k0) != 0:
             k0 /= np.linalg.norm(k0)
         dot = np.dot(k0, n0)
-        d0 = map(lambda k: k * dot, k0)
-        d0 = [n - k for n, k in zip(n0, d0)]
+        d0 = [n-k for n, k in zip(n0, [dot*k for k in k0])]
         if np.linalg.norm(d0) != 0:
             return d0/np.linalg.norm(d0)
         else:
-            return [0, 0, 0]    
+            return [0, 0, 0]
 
     def refracted_angle(self, incident_angle):
-        return cm.asin(self.nm*ma.sin(incident_angle)/self.np).real
+        return cm.asin(self.medium_refractive_index
+                       *ma.sin(incident_angle)
+                       /self.refractive_index).real
 
     def reflectance(self, incident_angle, crossing_angle=pi/4):
         # Crossing angle between the polarization direction of
@@ -239,7 +250,9 @@ class SphericalParticle(object):
     def transmittance(self, incident_angle, crossing_angle=pi/4):
         return 1 - self.reflectance(incident_angle, crossing_angle)
 
-    def reflected_ray(self, k0, theta, phi, crossing_angle=pi/4):
+    def reflected_ray(self, incident_ray, theta, phi, 
+            crossing_angle=pi/4):
+        k0 = incident_ray
         abs_k0 = np.linalg.norm(k0)
         if abs_k0 == 0:
             return [0, 0, 0]
@@ -247,20 +260,21 @@ class SphericalParticle(object):
             k0 /= abs_k0
 
         thetai = self.incident_angle(k0, theta, phi)
-        
+
         if abs(thetai) >= pi/2:
             return [0, 0, 0]
 
         d0 = self.d0(k0, theta, phi)
-
-        rotation = cm.exp(1j*(pi-2*thetai)) 
+        rotation = cm.exp(1j*(pi-2*thetai))
         a_k0, a_d0 = rotation.real, rotation.imag
         ref_ray = [a_k0*k + a_d0*d for k, d in zip(k0, d0)]
         abs_ref_ray = abs_k0*self.reflectance(thetai, crossing_angle)
 
         return [abs_ref_ray*component for component in ref_ray]
 
-    def internal_ray(self, k0, theta, phi, n=0, crossing_angle=pi/4):
+    def internal_ray(self, incident_ray, theta, phi, n=0, 
+            crossing_angle=pi/4):
+        k0 = incident_ray
         abs_k0 = np.linalg.norm(k0)
         if abs_k0 == 0:
             return [0, 0, 0]
@@ -277,16 +291,19 @@ class SphericalParticle(object):
         R = self.reflectance(thetai, crossing_angle)
         # Distance travelled by a single ray before and after hit
         # sphere's surface.
-        l = 2*self.Rp*ma.cos(thetar)
+        l = 2*self.radius*ma.cos(thetar)
 
         rotation = cm.exp(-1j*(n*(pi-2*thetar)+(thetai-thetar))) 
         a_k0, a_d0 = rotation.real, rotation.imag
         int_ray = [a_k0*k + a_d0*d for k, d in zip(k0, d0)]
-        abs_int_ray = abs_k0*ma.exp(-self.alphap*l)*(1-R)*R**n
+        abs_int_ray = (abs_k0*ma.exp(-self.absorption_coefficient*l)
+                       * (1-R)*R**n)
 
         return [abs_int_ray*component for component in int_ray]
 
-    def refracted_ray(self, k0, theta, phi, n=0, crossing_angle=pi/4):
+    def refracted_ray(self, incident_ray, theta, phi, n=0, 
+            crossing_angle=pi/4):
+        k0 = incident_ray
         abs_k0 = np.linalg.norm(k0)
         if abs_k0 == 0:
             return [0, 0, 0]
@@ -303,16 +320,18 @@ class SphericalParticle(object):
         R = self.reflectance(thetai, crossing_angle)
         # Distance travelled by a single ray before and after hit
         # sphere's surface.
-        l = 2*self.Rp*ma.cos(thetar)
+        l = 2*self.radius*ma.cos(thetar)
 
         rotation = cm.exp(-1j*(n*(pi-2*thetar)+2*(thetai-thetar))) 
         a_k0, a_d0 = rotation.real, rotation.imag
         refrac_ray = [a_k0*k + a_d0*d for k, d in zip(k0, d0)]
-        abs_refrac_ray = abs_k0*ma.exp(-self.alphap*l)*(1-R)**2*R**n
+        abs_refrac_ray = (abs_k0*ma.exp(-self.absorption_coefficient*l)
+                          *(1-R)**2*R**n)
 
         return [abs_refrac_ray*component for component in refrac_ray]
 
-    def Qkd(self, k0, theta, phi, crossing_angle=pi/4):
+    def Qkd(self, incident_ray, theta, phi, crossing_angle=pi/4):
+        k0 = incident_ray
         abs_k0 = np.linalg.norm(k0)
         if abs_k0 == 0:
             return [0, 0, 0]
@@ -329,42 +348,44 @@ class SphericalParticle(object):
         R = self.reflectance(thetai, crossing_angle)
         # Distance travelled by a single ray before and after hit
         # sphere's surface.
-        l = 2*self.Rp*ma.cos(thetar)
+        l = 2*self.radius*ma.cos(thetar)
 
-        den = (1 + R**2 * ma.exp(-2*self.alphap*l)
-               + 2*R*ma.exp(-self.alphap*l)*ma.cos(2*thetar))
+        den = (1 + R**2 * ma.exp(-2*self.absorption_coefficient*l)
+               + 2*R*ma.exp(-self.absorption_coefficient*l)
+               * ma.cos(2*thetar))
 
         if den != 0:
             Qk = (1 + R*ma.cos(2*thetai)
-                  - (1-R)**2*ma.exp(-self.alphap*l)
+                  - (1-R)**2*ma.exp(-self.absorption_coefficient*l)
                   * (ma.cos(2*(thetai-thetar))
-                     + R*ma.exp(-self.alphap*l)
+                     + R*ma.exp(-self.absorption_coefficient*l)
                      * ma.cos(2*thetai))
                   / den)
 
             Qd = -(R*ma.sin(2*thetai)
-                   - (1-R)**2 * ma.exp(-self.alphap*l)
+                   - (1-R)**2 * ma.exp(-self.absorption_coefficient*l)
                    * (ma.sin(2*(thetai-thetar))
-                      + R*ma.exp(-self.alphap*l)
+                      + R*ma.exp(-self.absorption_coefficient*l)
                       * ma.sin(2*thetai))
                    / den)
 
         else:
             Qk = (1 + R*ma.cos(2*thetai)
-                  - ma.exp(-self.alphap*l)
+                  - ma.exp(-self.absorption_coefficient*l)
                   * (ma.cos(2*(thetar-thetai))
-                     + R*ma.exp(-self.alphap*l)
+                     + R*ma.exp(-self.absorption_coefficient*l)
                      * ma.cos(2 * thetai)))
 
             Qd = -(R*ma.sin(2*thetai)
-                   - ma.exp(-self.alphap*l)
+                   - ma.exp(-self.absorption_coefficient*l)
                    * (ma.sin(2*(thetai-thetar))
-                      + R*ma.exp(-self.alphap*l)
+                      + R*ma.exp(-self.absorption_coefficient*l)
                       * ma.sin(2*thetai)))
 
         return Qk, Qd
 
-    def force_ray(self, k0, theta, phi, crossing_angle=pi/4):
+    def force_ray(self, incident_ray, theta, phi, crossing_angle=pi/4):
+        k0 = incident_ray
         abs_k0 = np.linalg.norm(k0)
         if abs_k0 == 0:
             return [0, 0, 0]
@@ -383,28 +404,29 @@ class SphericalParticle(object):
         f = [Qk*k + Qd*d for k, d in zip(k0, d0)]
 
         msg = ''
-        msg += 'theta: ' + str(round_sig(theta*180/pi, 2)) + '\n'
-        msg += 'phi:   ' + str(round_sig(phi*180/pi, 2)) + '\n'
-        msg += 'thetai:' + str(round_sig(thetai*180/pi, 2)) + '\n'
-        msg += 'k0:    ' + '[' + str(round_sig(k0[0], 2)) + ', ' + str(round_sig(k0[1], 2)) + ', ' + str(round_sig(k0[2], 2)) + '] \n'
-        msg += 'd0:    ' + '[' + str(round_sig(d0[0], 2)) + ', ' + str(round_sig(d0[1], 2)) + ', ' + str(round_sig(d0[2], 2)) + '] \n'
-        msg += 'Qk:    ' + str(round_sig(Qk, 2)) + '\n'
-        msg += 'Qd:    ' + str(round_sig(Qd, 2)) + '\n'
-        msg += 'f:     ' + '[' + str(round_sig(f[0], 2)) + ', ' + str(round_sig(f[1], 2)) + ', ' + str(round_sig(f[2], 2)) + '] \n'
+        msg += 'theta: ' + str(round_sig(theta*180/pi, 3)) + '\n'
+        msg += 'phi:   ' + str(round_sig(phi*180/pi, 3)) + '\n'
+        msg += 'thetai:' + str(round_sig(thetai*180/pi, 3)) + '\n'
+        msg += 'k0:    ' + '[' + str(round_sig(k0[0], 3)) + ', ' + str(round_sig(k0[1], 3)) + ', ' + str(round_sig(k0[2], 3)) + '] \n'
+        msg += 'd0:    ' + '[' + str(round_sig(d0[0], 3)) + ', ' + str(round_sig(d0[1], 3)) + ', ' + str(round_sig(d0[2], 3)) + '] \n'
+        msg += 'Qk:    ' + str(round_sig(Qk, 3)) + '\n'
+        msg += 'Qd:    ' + str(round_sig(Qd, 3)) + '\n'
+        msg += 'f:     ' + '[' + str(round_sig(f[0], 3)) + ', ' + str(round_sig(f[1], 3)) + ', ' + str(round_sig(f[2], 3)) + '] \n'
 
 
-        #print(msg)
+        print(msg)
 
-        return [abs_k0*component for component in f]
+        return [self.medium_refractive_index*abs_k0**2*component
+                / speed_of_light for component in f]
 
 
 class Force(object):
     def __init__(self):
-        pass    
+        pass
 
     @classmethod
-    @save_database('geo-opt-without-k0')
-    def _geo_opt(cls, beam, ptc, ptc_pos):
+    #@save_database('geo-opt-without-k0')
+    def geo_opt(cls, beam, ptc, ptc_pos):
         """ Force that beam causes in a spherical particle in a deter-
         mined position in geometrical optics regime (particle radius is
         greater than 10 times beam's wavelenght).
@@ -427,17 +449,17 @@ class Force(object):
         """
 
         # assert about required particle parameters
-        assert isinstance(ptc.Rp, Number), \
-            ('Particle param Rp not defined')
+        assert isinstance(ptc.radius, Number), \
+            ('Particle param radius not defined')
 
-        assert isinstance(ptc.np, Number), \
-            ('Particle param np not defined')
+        assert isinstance(ptc.refractive_index, Number), \
+            ('Particle param refractive_index not defined')
 
-        assert isinstance(ptc.alphap, Number), \
-            ('Particle param alphap not defined')
+        assert isinstance(ptc.absorption_coefficient, Number), \
+            ('Particle param absorption_coefficient not defined')
 
         # assert about geometric optics force approximation condition
-        assert ptc.Rp >= 9.9 * beam.wavelength, \
+        assert ptc.radius >= 9.9 * beam.wavelength, \
             ('Particle radius length less than 10 * wavelength')
 
         # Return each infinitesimal sphere surface force contribuition,
@@ -448,30 +470,32 @@ class Force(object):
 
             # Beam particle surface: beam coordinates point that
             # match the point at theta and phi on particle surface.
-            bps = Point(ptc.Rp, theta, phi, 'spher') + ptc_pos
+            bps = Point(ptc.radius, theta, phi, 'spher') + ptc_pos
 
             # Vector parallel to the direction of a single ray.
             k0 = beam.k0(bps)
 
-            # Incident angle.
-            thetai = ptc.incident_angle(k0, theta, phi)
+            # Beam's power at particle surface
+            power = beam.intensity(bps)
+
+            # Incident ray: vector k0 plus its power (intensity)
+            incident_ray = [power*k for k in k0]
 
             # Force of a single ray.
-            f = ptc.force_ray(k0, theta, phi, beam.beta)
-
-            F = [beam.nm*f*beam.intensity(bps)/c for f in f]
+            force = ptc.force_ray(incident_ray, theta, phi, 
+                                  beam.crossing_angle)
 
             # Return [[Integrand value], [dA]]
-            return [(F*ma.sin(theta)*ptc.Rp**2) for F in F]
+            return [f*ma.sin(theta)*ptc.radius**2 for f in force]
 
-        
+
         # Effective area's element. Some regions are not illuminated
         # by beam, therefore, this function returns only element of
         # area that is illuminated.
         def effective_dA(theta, phi):
             # Beam particle surface: beam coordinates point that
             # match the point at theta and phi on particle surface.
-            bps = Point(ptc.Rp, theta, phi, 'spher') + ptc_pos
+            bps = Point(ptc.radius, theta, phi, 'spher') + ptc_pos
 
             # Vector parallel to the direction of a single ray.
             k0 = beam.k0(bps)
@@ -488,7 +512,7 @@ class Force(object):
             if thetai >= pi/2:
                 return 0
             else:
-                return ptc.Rp**2*ma.sin(theta)
+                return ptc.radius**2*ma.sin(theta)
 
         # integral over semisphere surface
         def force_times_surface(forceDirection):
@@ -510,7 +534,7 @@ class Force(object):
             return f
 
         # Effective surface which is illuminated.
-        A, err = dblquad(lambda t, p: effective_dA(t, p),
+        A, err = dblquad(effective_dA,
                          0,  # phi initial
                          2*pi,  # phi final
                          lambda t: 0,  # theta initial
@@ -525,17 +549,14 @@ class Force(object):
 
 
 if __name__ == '__main__':
-    ptc = SphericalParticle(Rp=11*1064e-9, 
-                            np=1, 
-                            nm=1000, 
-                            alphap=0e6)
+    from beam import *
+    ptc = SphericalParticle(radius=11*1064e-9, 
+                            refractive_index=1, 
+                            medium_refractive_index=1, 
+                            absorption_coefficient=1e10)
 
-    beam = BesselBeam(nm=1, wavelength=1064e-9, theta=10/180*pi)
+    beam = BesselBeam(medium_refractive_index=1, wavelength=1064e-9, 
+                      axicon_angle=0.1)
 
-    ptc_pos = Point(0, 0, 10e-3)
-
-    k0 = [0, 0, -1]
-
-    print(ptc.d0(k0, 3*pi/4, 0))
-    print(ptc.Qkd(k0, 3*pi/4, 0))
-    print(ptc.force_ray(k0, 3*pi/4, 0))
+    print(ptc.force_ray(theta=3*pi/4, phi=0, incident_ray=[0,0,2]))
+    #print(Force.geo_opt(beam, ptc, Point(1e-6, 0, 0.1)))
