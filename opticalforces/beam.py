@@ -1,3 +1,26 @@
+# -*- coding: utf-8 -*-
+"""Beam module belonging to optical forces master degree project
+
+This module provides classes which defines some optical beams, like
+Bessel beam or Frozen Waves. Until now, we have these beams implemented:
+    - Plane Wave
+    - Bessel Beam
+    - Gaussian Beam
+    - Bessel-Gauss Beam
+    - Bessel-Gauss Beam superposition
+    - Frozen Waves
+
+Example:
+    ...
+
+Todo:
+    * Create all docstrings
+
+.. Project:
+   https://github.com/arantespp/opticalforces
+
+"""
+
 import math as ma
 from math import pi
 import cmath as cm
@@ -8,26 +31,32 @@ import numpy as np
 
 
 def add_amplitude(psi):
+    """ Decorator to add amplitude to all beam 'psi' function """
     @wraps(psi)
-    def wrapped(self, pt):
-        return psi(self, pt)*self.amplitude
+    def wrapped(self, point):
+        return psi(self, point)*self.amplitude
     return wrapped
 
 def add_phase(psi):
+    """ Decorator to add phase to all beam 'psi' function """
     @wraps(psi)
-    def wrapped(self, pt):
-        return psi(self, pt)*cm.exp(1j*self.phase)
+    def wrapped(self, point):
+        return psi(self, point)*cm.exp(1j*self.phase)
     return wrapped
 
 
 class Beam(object):
+    params = ('_amplitude',
+              '_phase',
+              '_crossing_angle',)
+
     def __init__(self, beams, name='generic-beam'):
         self.beams = beams
         self.name = name
 
         self._amplitude = 1
         self._phase = 0
-        self._crossing_angle = pi/4
+        self._crossing_angle = 0
 
     def __str__(self):
         out = 'name: ' + self.name + '\n'
@@ -70,97 +99,23 @@ class Beam(object):
                 return False
         return True
 
-    def psi(self, pt):
-        return sum([beam.psi(pt) for beam in self.beams])
+    def psi(self, point):
+        return sum([beam.psi(point) for beam in self.beams])
 
-    def intensity(self, pt):
+    def intensity(self, point):
         """ Wave's intensity.
 
         Args:
-            pt (:obj:'Point'): point at which want to calculate wave's
-                intensity, that is psi's abs squared.
+            point (:obj:'Point'): point at which want to calculate
+                wave's intensity, that is psi's abs squared.
 
         Returns:
             Wave's intensity.
 
         """
-        return abs(self.psi(pt))**2
+        return abs(self.psi(point))**2
 
-    def RS(self, pt, r_max, r_min=0, np_rho=501, np_phi=3):
-        """ Wave's Raleigh-Sommerfeld integral by 1/3 Simpson's Rule.
-
-        Args:
-            pt (:obj:'Point'): point at which want to calculate wave's
-                Rayleigh-Sommerfeld complex value.
-            r_max: aperture radius that will be used to simulate the
-                wave aperture truncate.
-            np_rho: rho's variable 1/3 Simpson's Rule discretization.
-                a.k.a: Rho's number points.
-            np_phi: phi's variable 1/3 Simpson's Rule discretization.
-                a.k.a: Phi's number points.
-
-        Returns:
-            Raleigh-Sommerfeld complex value at a specific point 'pt'
-                given a aperture with radius 'r_max'.
-
-        """
-
-        # RS integral's integrand
-        def R(rho, phi):
-            return (pt - Point(rho, phi, 0, 'cilin')).r
-
-        def E(rho, phi):
-            return cm.exp(1j*self.wavenumber*R(rho, phi))
-
-        def integrand(rho, phi):
-            return (rho*self.psi(Point(rho, phi, 0, 'cilin'))
-                    *E(rho, phi) / R(rho, phi)**2)
-
-        # S: 1/3 Simp's rule auxiliary matrix.
-        auxrhovec = [1 if (rho == 0 or rho == np_rho - 1) \
-            else (4 if rho % 2 != 0 else 2) for rho in range(np_rho)]
-
-        auxphivec = [1 if (phi == 0 or phi == np_phi - 1) \
-            else (4 if phi % 2 != 0 else 2) for phi in range(np_phi)]
-
-        S = [[i * j for i in auxrhovec] for j in auxphivec]
-
-        # F: 'integrand' mapped at discretized RS points.
-        rhovec = np.linspace(r_min, r_max, np_rho)
-
-        phivec = np.linspace(0, 2*ma.pi, np_phi)
-
-        F = [[pt.z*integrand(rho, phi) / (1j*self.wavelength)
-              for rho in rhovec]
-             for phi in phivec]
-
-        # Hadamard product between 'F' and 'S'
-        H = sum(sum(np.multiply(F, S)))
-
-        # Interval's discretization
-        hrho = (r_max - r_min) / (np_rho-1)
-        hphi = 2*ma.pi / (np_phi-1)
-
-        return hphi*hrho*H/9
-
-    def RSI(self, pt, r_max, r_min=0, np_rho=501, np_phi=3):
-        """ Wave's Raleigh-Sommerfeld integral intensity.
-
-        Args:
-            pt (:obj:'Point'): point at which want to calculate wave's
-                Rayleigh-Sommerfeld complex value.
-            r_max: aperture radius that will be used to simulate the
-                wave aperture truncate.
-
-        Returns:
-            Raleigh-Sommerfeld intensity value at a specific point 'pt'
-                given a aperture with radius 'r_max'.
-
-        """
-
-        return abs(self.RS(pt, r_max, r_min, np_rho, np_phi))**2
-
-    def k0(self, pt):
+    def wavenumber_direction(self, point):
         """ k0 vector's direction.
 
         k0 vector's direction is defined by gradient of phase function.
@@ -169,11 +124,11 @@ class Beam(object):
         http://web.media.mit.edu/~crtaylor/calculator.htm site.
 
         Args:
-            pt (:obj:'Point'): point at which want to calculate wave's
-                k0 vector's direction.
+            point (:obj:'Point'): point at which want to calculate
+                wave's k0 vector's direction.
 
         Returns:
-            A list containing the normalized k0 vector - [kx, ky, longitudinal_wavenumber]
+            A list containing the normalized k0 vector - [kx, ky, kz]
         """
 
         # Delta
@@ -189,9 +144,9 @@ class Beam(object):
         fdc = [-1, 9, -45, 0, 45, -9, 1]
 
         # Psi calculated over samples points
-        psix = [self.psi(Point(pt.x + i*h, pt.y, pt.z)) for i in lsp]
-        psiy = [self.psi(Point(pt.x, pt.y + i*h, pt.z)) for i in lsp]
-        psiz = [self.psi(Point(pt.x, pt.y, pt.z + i*h)) for i in lsp]
+        psix = [self.psi(Point(point.x + i*h, point.y, point.z)) for i in lsp]
+        psiy = [self.psi(Point(point.x, point.y + i*h, point.z)) for i in lsp]
+        psiz = [self.psi(Point(point.x, point.y, point.z + i*h)) for i in lsp]
 
         # Psi derivative
         psi_x = np.dot(fdc, psix)/den
@@ -199,7 +154,7 @@ class Beam(object):
         psi_z = np.dot(fdc, psiz)/den
 
         # k0 components
-        psi = self.psi(pt)
+        psi = self.psi(point)
         k0x = (psi_x/psi).imag
         k0y = (psi_y/psi).imag
         k0z = (psi_z/psi).imag
@@ -220,14 +175,12 @@ class Beam(object):
 
 
 class PlaneWave(Beam):
-    params = ('_amplitude',
-              '_phase',
-              '_crossing_angle',
-              '_vacuum_wavelength',
-              '_vacuum_wavenumber',
-              '_medium_refractive_index',
-              '_wavelength',
-              '_wavenumber',)
+    params = Beam.params
+    params += ('_vacuum_wavelength',
+               '_vacuum_wavenumber',
+               '_medium_refractive_index',
+               '_wavelength',
+               '_wavenumber',)
 
     def __init__(self, **kwargs):
         Beam.__init__(self, self)
@@ -313,7 +266,8 @@ class PlaneWave(Beam):
 
         if (self.medium_refractive_index is None
                 and self.vacuum_wavenumber is not None):
-            self.medium_refractive_index = 2*pi/(wl*self.vacuum_wavenumber)
+            k0 = self.vacuum_wavenumber
+            self.medium_refractive_index = 2*pi/(wl*k0)
 
     @property
     def wavenumber(self):
@@ -332,8 +286,7 @@ class PlaneWave(Beam):
 
         if (self.medium_refractive_index is None
                 and self.vacuum_wavelength is not None):
-            self.medium_refractive_index = (k*self.vacuum_wavelength
-                                            / (2*pi))
+            self.medium_refractive_index = (k*self.vacuum_wavelength/(2*pi))
 
     # ----- medium refractive index -----
 
@@ -364,19 +317,19 @@ class PlaneWave(Beam):
 
     @add_phase
     @add_amplitude
-    def psi(self, pt):
+    def psi(self, point):
         """ Wave's equation 'psi'.
 
         Args:
-            pt (:obj:'Point'): point at which want to calculate 'psi'
-                value.
+            point (:obj:'Point'): point at which want to calculate
+                'psi' value.
 
         Returns:
             Wave's equation complex value of default plane wave decla-
                 red on beam class.
 
         """
-        return cm.exp(1j*self._wavenumber*pt.z)
+        return cm.exp(1j*self.wavenumber*point.z)
 
 
 class BesselBeam(PlaneWave):
@@ -417,8 +370,7 @@ class BesselBeam(PlaneWave):
 
         if (self.medium_refractive_index is None
                 and self.vacuum_wavelength is not None):
-            self.medium_refractive_index = (k*self.vacuum_wavelength
-                                            / (2*pi))
+            self.medium_refractive_index = (k*self.vacuum_wavelength/(2*pi))
 
         if self.longitudinal_wavenumber is not None:
             kz = self.longitudinal_wavenumber
@@ -519,48 +471,47 @@ class BesselBeam(PlaneWave):
 
     @add_phase
     @add_amplitude
-    def psi(self, pt):
-        return (ss.jv(self._bessel_order, self._transversal_wavenumber*pt.rho)
-                * cm.exp(1j*self._longitudinal_wavenumber*pt.z)
-                * cm.exp(1j*self._bessel_order*pt.phi))
+    def psi(self, point):
+        return (ss.jv(self.bessel_order, self.transversal_wavenumber*point.rho)
+                * cm.exp(1j*self.longitudinal_wavenumber*point.z)
+                * cm.exp(1j*self.bessel_order*point.phi))
 
 
 class GaussianBeam(PlaneWave):
     params = PlaneWave.params
-    params += ('_q_constant',)
+    params += ('_q',)
 
     def __init__(self, **kwargs):
         PlaneWave.__init__(self)
 
         self.name = 'gaussian-beam'
 
-        self._q_constant = 1
+        self._q = 1
 
         for key, value in kwargs.items():
             if hasattr(self, '_' + key):
                 setattr(self, key, value)
 
     @property
-    def q_constant(self):
-        return self._q_constant
+    def q(self):
+        return self._q
 
-    @q_constant.setter
-    def q_constant(self, q):
-        self._q_constant = q
+    @q.setter
+    def q(self, q):
+        self._q = q
 
     @add_phase
     @add_amplitude
-    def psi(self, pt):
+    def psi(self, point):
         k = self.wavenumber
-        q = self.q_constant
-        return ((1/(1 + 1j*pt.z*2*q/k))
-                * cm.exp(1j*pt.z*k)
-                * cm.exp((-q*pt.rho**2)/(1+1j*pt.z*2*q/k)))
+        q = self.q
+        return ((1/(1 + 1j*point.z*2*q/k))*cm.exp(1j*point.z*k)
+                * cm.exp((-q*point.rho**2)/(1+1j*point.z*2*q/k)))
 
 
 class BesselGaussBeam(BesselBeam, GaussianBeam):
     params = BesselBeam.params
-    params += ('_q_constant',)
+    params += ('_q',)
 
     def __init__(self, **kwargs):
         BesselBeam.__init__(self)
@@ -574,23 +525,22 @@ class BesselGaussBeam(BesselBeam, GaussianBeam):
 
     @add_phase
     @add_amplitude
-    def psi(self, pt):
-        q = self.q_constant
+    def psi(self, point):
+        q = self.q
         k = self.wavenumber
         krho = self.transversal_wavenumber
 
-        if pt.z != 0:
-            Q = q - 1j*k/(2*pt.z)
-            num = 1j*k/(2*pt.z*Q)
-            exp1 = cm.exp(1j*k*(pt.z+pt.rho**2/(2*pt.z)))
-            bessel = ss.jv(0, num*krho*pt.rho)
-            exp2 = cm.exp((krho**2 + k**2*pt.rho**2/pt.z**2)
-                          * (-1/(4*Q)))
+        if point.z != 0:
+            Q = q - 1j*k/(2*point.z)
+            num = 1j*k/(2*point.z*Q)
+            exp1 = cm.exp(1j*k*(point.z+point.rho**2/(2*point.z)))
+            bessel = ss.jv(0, num*krho*point.rho)
+            exp2 = cm.exp(-(krho**2 + k**2*point.rho**2/point.z**2)/(4*Q))
             if ma.isinf(bessel.real) is True:
-                return ss.jv(0, krho*pt.rho)*cm.exp(-q*pt.rho**2)
+                return ss.jv(0, krho*point.rho)*cm.exp(-q*point.rho**2)
             return -num*exp1*bessel*exp2
         else:
-            return ss.jv(0, krho*pt.rho)*cm.exp(-q*pt.rho**2)
+            return ss.jv(0, krho*point.rho)*cm.exp(-q*point.rho**2)
 
 
 class BesselGaussBeamSuperposition(BesselGaussBeam):
@@ -598,8 +548,8 @@ class BesselGaussBeamSuperposition(BesselGaussBeam):
     params += ('_N',
                '_z_max',
                '_aperture_radius',
-               '_L_constant',
-               '_q_constant_real')
+               '_L',
+               '_qr')
 
     def __init__(self, **kwargs):
         BesselGaussBeam.__init__(self)
@@ -608,12 +558,12 @@ class BesselGaussBeamSuperposition(BesselGaussBeam):
 
         self.beams = []
 
-        self._q_constant = None
+        self._q = None
         self._N = None
         self._z_max = None
         self._aperture_radius = None
-        self._L_constant = None
-        self._q_constant_real = None
+        self._L = None
+        self._qr = None
 
         for key, value in kwargs.items():
             if hasattr(self, '_' + key):
@@ -625,20 +575,19 @@ class BesselGaussBeamSuperposition(BesselGaussBeam):
         out = ''
         out += str(PlaneWave.__str__(self))
         for i, beam in enumerate(self.beams):
-            out += ('\n' + 'beam %d (n: %d)' %(i+1,
-                                               i-len(self.beams)//2))
+            out += ('\n' + 'beam %d (n: %d)' %(i+1, i-len(self.beams)//2))
             out += '\n    ' + '_amplitude: ' + str(beam.amplitude)
-            out += '\n    ' + '_q_constant: ' + str(beam.q_constant)
+            out += '\n    ' + '_q: ' + str(beam.q)
             out += '\n'
         return out
 
     @property
-    def q_constant(self):
-        return self._q_constant
+    def q(self):
+        return self._q
 
-    @q_constant.setter
-    def q_constant(self, q):
-        self._q_constant = q
+    @q.setter
+    def q(self, q):
+        self._q = q
         self.__create_superposition()
 
     @property
@@ -658,13 +607,11 @@ class BesselGaussBeamSuperposition(BesselGaussBeam):
     def z_max(self, value):
         self._z_max = value
         if (self.axicon_angle is None
-                and self._aperture_radius is not None):
-            self.axicon_angle = ma.atan(self._aperture_radius
-                                        /self._z_max)
-        if (self._axicon_angle is not None
-                and self._aperture_radius is None):
-            self._aperture_radius = (self._z_max
-                                     *ma.tan(self._axicon_angle))
+                and self.aperture_radius is not None):
+            self.axicon_angle = ma.atan(self.aperture_radius/self.z_max)
+        if (self.axicon_angle is not None
+                and self.aperture_radius is None):
+            self.aperture_radius = (self.z_max*ma.tan(self.axicon_angle))
 
         self.__create_superposition()
 
@@ -675,13 +622,13 @@ class BesselGaussBeamSuperposition(BesselGaussBeam):
     @aperture_radius.setter
     def aperture_radius(self, value):
         self._aperture_radius = value
-        self.L_constant = 3*value**2
+        self.L = 3*value**2
 
         if self.axicon_angle is None and self.z_max is not None:
-            self.axicon_angle = ma.atan(value/self._z_max)
+            self.axicon_angle = ma.atan(value/self.z_max)
 
-        if self.axicon_angle is not None and self._z_max is None:
-            self.z_max = value/ma.tan(self._axicon_angle)
+        if self.axicon_angle is not None and self.z_max is None:
+            self.z_max = value/ma.tan(self.axicon_angle)
 
         self.__create_superposition()
 
@@ -715,22 +662,22 @@ class BesselGaussBeamSuperposition(BesselGaussBeam):
         self.__create_superposition()
 
     @property
-    def L_constant(self):
-        return self._L_constant
+    def L(self):
+        return self._L
 
-    @L_constant.setter
-    def L_constant(self, L):
-        self._L_constant = L
-        self.q_constant_real = 6/L
+    @L.setter
+    def L(self, L):
+        self._L = L
+        self.qr = 6/L
         self.__create_superposition()
 
     @property
-    def q_constant_real(self):
-        return self._q_constant_real
+    def qr(self):
+        return self._qr
 
-    @q_constant_real.setter
-    def q_constant_real(self, qr):
-        self._q_constant_real = qr
+    @qr.setter
+    def qr(self, qr):
+        self._qr = qr
         self.__create_superposition()
 
     def __create_superposition(self):
@@ -738,13 +685,8 @@ class BesselGaussBeamSuperposition(BesselGaussBeam):
             return
 
         def amplitude_n(n):
-            qr = self.q_constant_real
-            q = self.q_constant
-            L = self.L_constant
-            R = self.aperture_radius
-
-            arg = (qr - q - 2j*pi*n/L)*R**2
-            den = L*(qr-q)/2 - 1j*pi*n
+            arg = (self.qr - self.q - 2j*pi*n/self.L)*self.aperture_radius**2
+            den = self.L*(self.qr-self.q)/2 - 1j*pi*n
             return cm.sinh(arg)/den
 
         self.beams = []
@@ -753,17 +695,16 @@ class BesselGaussBeamSuperposition(BesselGaussBeam):
             n_index = i - self.N
             beam = BesselGaussBeam()
             beam.amplitude = amplitude_n(n_index)
-            beam.wavelength = self._wavelength
+            beam.wavelength = self.wavelength
             beam.medium_refractive_index = self.medium_refractive_index
             beam.transversal_wavenumber = self.transversal_wavenumber
-            beam.q_constant = (self.q_constant_real
-                               - 1j*2*pi*n_index/self.L_constant)
+            beam.q = (self.qr - 1j*2*pi*n_index/self.L)
             self.beams.append(beam)
 
     @add_phase
     @add_amplitude
-    def psi(self, pt):
-        return sum([beam.psi(pt) for beam in self.beams])
+    def psi(self, point):
+        return sum([beam.psi(point) for beam in self.beams])
 
 
 class FrozenWave(PlaneWave):
@@ -795,15 +736,14 @@ class FrozenWave(PlaneWave):
         out = ''
         out += str(PlaneWave.__str__(self))
         for i, beam in enumerate(self.beams):
-            out += ('\n' + 'beam %d (n: %d)' %(i+1,
-                                               i-len(self.beams)//2))
-            out += '\n    ' + 'amplitude: ' 
+            out += ('\n' + 'beam %d (n: %d)' %(i+1, i-len(self.beams)//2))
+            out += '\n    ' + 'amplitude: '
             out += str(beam.amplitude)
-            out += '\n    ' + 'longitudinal_wavenumber: ' 
+            out += '\n    ' + 'longitudinal_wavenumber: '
             out += str(beam.longitudinal_wavenumber)
-            out += '\n    ' + 'transversal_wavenumber: ' 
+            out += '\n    ' + 'transversal_wavenumber: '
             out += str(beam.transversal_wavenumber)
-            out += '\n    ' + 'axicon_angle: ' 
+            out += '\n    ' + 'axicon_angle: '
             out += str(beam.axicon_angle) + ' rad / '
             out += str(beam.axicon_angle*180/pi)  + ' degrees'
             out += '\n'
@@ -852,10 +792,8 @@ class FrozenWave(PlaneWave):
             return
 
         def amplitude_n(n):
-            func_real = lambda z: (self.func(z)
-                                   * cm.exp(-2j*pi*z*n/self.L)).real
-            func_imag = lambda z: (self.func(z)
-                                   * cm.exp(-2j*pi*z*n/self.L)).imag
+            func_real = lambda z: (self.func(z)*cm.exp(-2j*pi*z*n/self.L)).real
+            func_imag = lambda z: (self.func(z)*cm.exp(-2j*pi*z*n/self.L)).imag
             an_real, err = quad(func_real, 0, self.L)
             an_imag, err = quad(func_imag, 0, self.L)
             return (an_real + 1j*an_imag)/self.L
@@ -892,8 +830,8 @@ class FrozenWave(PlaneWave):
 
     @add_phase
     @add_amplitude
-    def psi(self, pt):
-        return sum([beam.psi(pt) for beam in self.beams])
+    def psi(self, point):
+        return sum([beam.psi(point) for beam in self.beams])
 
 
 class Point(object):
@@ -937,7 +875,7 @@ class Point(object):
                 + "Cilin = (%s, %s, %s)."
                 % (str(self.rho), str(self.phi), str(self.z)) + '\n'
                 + "Spher = (%s, %s, %s)."
-                % (str(self.r), str(self.axicon_angle), str(self.phi)))
+                % (str(self.r), str(self.theta), str(self.phi)))
 
     def __init(self, x, y, z):
         # cartesian
@@ -948,7 +886,7 @@ class Point(object):
         # cilindrical
         self.rho = ma.sqrt(x**2 + y**2)
         if x != 0:
-            self.phi = ma.atan(y / x)
+            self.phi = ma.atan(y/x)
             self.phi += pi if x <= 0 and y >= 0 else 0
             self.phi -= pi if x <= 0 and y < 0 else 0
         else:
@@ -962,9 +900,9 @@ class Point(object):
         # spherical
         self.r = ma.sqrt(x**2 + y**2 + z**2)
         if self.r != 0:
-            self.axicon_angle = ma.acos(z / self.r)
+            self.theta = ma.acos(z/self.r)
         else:
-            self.axicon_angle = 0.0
+            self.theta = 0.0
 
     def abs(self):
         return self.r
