@@ -25,6 +25,7 @@ import math as ma
 from math import pi
 import cmath as cm
 from functools import wraps
+import copy
 import scipy.special as ss
 from scipy.integrate import quad
 import numpy as np
@@ -46,27 +47,85 @@ def add_phase(psi):
 
 
 class Beam(object):
-    params = ('_amplitude',
-              '_phase',
-              '_crossing_angle',)
+    generic_params = ('_vacuum_wavelength',
+                      '_vacuum_wavenumber',
+                      '_medium_refractive_index',
+                      '_wavelength',
+                      '_wavenumber',)
+
+    amp_pha_params = ('_amplitude',
+                      '_phase',)
+
+    intrinsic_params = ()
+
+    params = amp_pha_params + generic_params + intrinsic_params
 
     def __init__(self, beams, name='generic-beam'):
         self.beams = beams
         self.name = name
 
+        if isinstance(beams, list) is True:
+            self._vacuum_wavelength = beams[0].vacuum_wavelength
+            self._vacuum_wavenumber = beams[0].vacuum_wavenumber
+            self._medium_refractive_index = beams[0].medium_refractive_index
+            self._wavelength = beams[0].wavelength
+            self._wavenumber = beams[0].wavenumber
+        else:
+            self._vacuum_wavelength = None
+            self._vacuum_wavenumber = None
+            self._medium_refractive_index = None
+            self._wavelength = None
+            self._wavenumber = None
+
         self._amplitude = 1
         self._phase = 0
-        self._crossing_angle = 0
 
     def __str__(self):
         out = 'name: ' + self.name + '\n'
-        for i, beam in enumerate(self.beams):
-            out += '\n' + 'beam %d (%d)' %(i+1, i-len(self.beams)//2)
-            out += '\n' + str(beam)
+        # print amplitude and phase
+        for param in self.amp_pha_params:
+            out += '    ' + param + ': ' + str(self.__dict__[param])
+            out += '\n'
+        # print generic params
+        for param in self.generic_params:
+            out += '    ' + param + ': ' + str(self.__dict__[param])
+            out += '\n'
+        for param in self.intrinsic_params:
+            out += '    ' + param + ': ' + str(self.__dict__[param])
+            out += '\n'
+        if len(self.beams) > 1:
+            # print beams
+            for i, beam in enumerate(self.beams):
+                out += '\n' + 'beam %d (%d)' %(i+1, i-len(self.beams)//2)
+                out += ': %s' %beam.name
+                out += '\n'
+                for param in beam.amp_pha_params:
+                    out += '    ' + param + ': ' + str(beam.__dict__[param])
+                    out += '\n'
+                for param in beam.intrinsic_params:
+                    out += '    ' + param + ': ' + str(beam.__dict__[param])
+                    out += '\n'
         return out
 
     def __add__(self, other):
-        beams = list(self.beams) + list(other.beams)
+        # raise error if one generic params if different from another.
+        if self.wavelength != other.wavelength:
+            raise NameError('Beams with differents wavelength')
+        if self.vacuum_wavelength != other.vacuum_wavelength:
+            raise NameError('Beams with differents vacuum_wavelength')
+        # effetuate the sum because all generic params is equal.
+        beams = []
+        for beam in self.beams:
+            b = copy.copy(beam)
+            b.amplitude *= self.amplitude
+            b.phase += self.phase
+            beams.append(b)
+        for beam in other.beams:
+            b = copy.copy(beam)
+            b.amplitude *= other.amplitude
+            b.phase += other.phase
+            beams.append(b)
+        #beams = list(self.beams) + list(other.beams)
         return Beam(beams)
 
     @property
@@ -84,128 +143,6 @@ class Beam(object):
     @phase.setter
     def phase(self, value):
         self._phase = value
-
-    @property
-    def crossing_angle(self):
-        return self._crossing_angle
-
-    @crossing_angle.setter
-    def crossing_angle(self, value):
-        self._crossing_angle = value
-
-    def is_all_parameters_defined(self):
-        for param, value in self.__dict__.items():
-            if value is None and param[0] == '_':
-                return False
-        return True
-
-    def psi(self, point):
-        return sum([beam.psi(point) for beam in self.beams])
-
-    def intensity(self, point):
-        """ Wave's intensity.
-
-        Args:
-            point (:obj:'Point'): point at which want to calculate
-                wave's intensity, that is psi's abs squared.
-
-        Returns:
-            Wave's intensity.
-
-        """
-        return abs(self.psi(point))**2
-
-    def wavenumber_direction(self, point):
-        """ k0 vector's direction.
-
-        k0 vector's direction is defined by gradient of phase function.
-        This method makes the phase derivative in x, y and z using Fi-
-        nite Difference Coefficients found on
-        http://web.media.mit.edu/~crtaylor/calculator.htm site.
-
-        Args:
-            point (:obj:'Point'): point at which want to calculate
-                wave's k0 vector's direction.
-
-        Returns:
-            A list containing the normalized k0 vector - [kx, ky, kz]
-        """
-
-        # Delta
-        h = 1e-10
-
-        # Denominator coefficient
-        den = 60*h
-
-        # Locations of Sampled Points
-        lsp = [-3, -2, -1, 0, 1, 2, 3]
-
-        # Finite Difference Coefficients
-        fdc = [-1, 9, -45, 0, 45, -9, 1]
-
-        # Psi calculated over samples points
-        psix = [self.psi(Point(point.x + i*h, point.y, point.z)) for i in lsp]
-        psiy = [self.psi(Point(point.x, point.y + i*h, point.z)) for i in lsp]
-        psiz = [self.psi(Point(point.x, point.y, point.z + i*h)) for i in lsp]
-
-        # Psi derivative
-        psi_x = np.dot(fdc, psix)/den
-        psi_y = np.dot(fdc, psiy)/den
-        psi_z = np.dot(fdc, psiz)/den
-
-        # k0 components
-        psi = self.psi(point)
-        k0x = (psi_x/psi).imag
-        k0y = (psi_y/psi).imag
-        k0z = (psi_z/psi).imag
-
-        if ma.isinf(k0x) is True or ma.isnan(k0x) is True:
-            return [0, 0, 0]
-        if ma.isinf(k0y) is True or ma.isnan(k0y) is True:
-            return [0, 0, 0]
-        if ma.isinf(k0z) is True or ma.isnan(k0z) is True:
-            return [0, 0, 0]
-
-        # normalize k0 vector
-        if k0x != 0 or k0y != 0 or k0z != 0:
-            k = [k0x, k0y, k0z]
-            return k/np.linalg.norm(k)
-        else:
-            return [0, 0, 1]
-
-
-class PlaneWave(Beam):
-    params = Beam.params
-    params += ('_vacuum_wavelength',
-               '_vacuum_wavenumber',
-               '_medium_refractive_index',
-               '_wavelength',
-               '_wavenumber',)
-
-    def __init__(self, **kwargs):
-        Beam.__init__(self, self)
-
-        self.beams = [self]
-
-        self.name = 'plane-wave'
-
-        self._vacuum_wavelength = None
-        self._vacuum_wavenumber = None
-        self._medium_refractive_index = None
-        self._wavelength = None
-        self._wavenumber = None
-
-        for key, value in kwargs.items():
-            if hasattr(self, '_' + key):
-                setattr(self, key, value)
-
-    def __str__(self):
-        out = 'name: ' + self.name + '\n'
-        for param in self.params:
-            out += '    '
-            out += param + ': ' + str(self.__dict__[param])
-            out += '\n'
-        return out
 
     # ----- vacuum -----
 
@@ -314,6 +251,104 @@ class PlaneWave(Beam):
                 and self.wavenumber is None):
             self.wavenumber = self.vacuum_wavenumber*nm
 
+    def is_all_parameters_defined(self):
+        for param, value in self.__dict__.items():
+            if value is None and param[0] == '_':
+                return False
+        return True
+
+    @add_phase
+    @add_amplitude
+    def psi(self, point):
+        return sum([beam.psi(point) for beam in self.beams])
+
+    def intensity(self, point):
+        """ Wave's intensity.
+
+        Args:
+            point (:obj:'Point'): point at which want to calculate
+                wave's intensity, that is psi's abs squared.
+
+        Returns:
+            Wave's intensity.
+
+        """
+        return abs(self.psi(point))**2
+
+    def wavenumber_direction(self, point):
+        """ k0 vector's direction.
+
+        k0 vector's direction is defined by gradient of phase function.
+        This method makes the phase derivative in x, y and z using Fi-
+        nite Difference Coefficients found on
+        http://web.media.mit.edu/~crtaylor/calculator.htm site.
+
+        Args:
+            point (:obj:'Point'): point at which want to calculate
+                wave's k0 vector's direction.
+
+        Returns:
+            A list containing the normalized k0 vector - [kx, ky, kz]
+        """
+
+        # Delta
+        h = 1e-10
+
+        # Denominator coefficient
+        den = 60*h
+
+        # Locations of Sampled Points
+        lsp = [-3, -2, -1, 0, 1, 2, 3]
+
+        # Finite Difference Coefficients
+        fdc = [-1, 9, -45, 0, 45, -9, 1]
+
+        # Psi calculated over samples points
+        psix = [self.psi(Point(point.x + i*h, point.y, point.z)) for i in lsp]
+        psiy = [self.psi(Point(point.x, point.y + i*h, point.z)) for i in lsp]
+        psiz = [self.psi(Point(point.x, point.y, point.z + i*h)) for i in lsp]
+
+        # Psi derivative
+        psi_x = np.dot(fdc, psix)/den
+        psi_y = np.dot(fdc, psiy)/den
+        psi_z = np.dot(fdc, psiz)/den
+
+        # k0 components
+        psi = self.psi(point)
+        k0x = (psi_x/psi).imag
+        k0y = (psi_y/psi).imag
+        k0z = (psi_z/psi).imag
+
+        if ma.isinf(k0x) is True or ma.isnan(k0x) is True:
+            return [0, 0, 0]
+        if ma.isinf(k0y) is True or ma.isnan(k0y) is True:
+            return [0, 0, 0]
+        if ma.isinf(k0z) is True or ma.isnan(k0z) is True:
+            return [0, 0, 0]
+
+        # normalize k0 vector
+        if k0x != 0 or k0y != 0 or k0z != 0:
+            k = [k0x, k0y, k0z]
+            return k/np.linalg.norm(k)
+        else:
+            return [0, 0, 1]
+
+
+class PlaneWave(Beam):
+    intrinsic_params = ()
+
+    params = Beam.params + intrinsic_params
+
+    def __init__(self, **kwargs):
+        Beam.__init__(self, self)
+
+        self.beams = [self]
+
+        self.name = 'plane-wave'
+
+        for key, value in kwargs.items():
+            if hasattr(self, '_' + key):
+                setattr(self, key, value)
 
     @add_phase
     @add_amplitude
@@ -332,21 +367,26 @@ class PlaneWave(Beam):
         return cm.exp(1j*self.wavenumber*point.z)
 
 
-class BesselBeam(PlaneWave):
-    params = PlaneWave.params
-    params += ('_longitudinal_wavenumber',
-               '_transversal_wavenumber',
-               '_axicon_angle',
-               '_bessel_order',)
+class BesselBeam(Beam):
+    intrinsic_params = ('_longitudinal_wavenumber',
+                        '_transversal_wavenumber',
+                        '_axicon_angle',
+                        '_axicon_angle_degree',
+                        '_bessel_order',)
+
+    params = Beam.params + intrinsic_params
 
     def __init__(self, **kwargs):
-        PlaneWave.__init__(self)
+        Beam.__init__(self, self)
+
+        self.beams = [self]
 
         self.name = 'bessel-beam'
 
         self._transversal_wavenumber = None
         self._longitudinal_wavenumber = None
         self._axicon_angle = None
+        self._axicon_angle_degree = None
         self._bessel_order = 0
 
         for key, value in kwargs.items():
@@ -447,6 +487,7 @@ class BesselBeam(PlaneWave):
     @axicon_angle.setter
     def axicon_angle(self, theta):
         self._axicon_angle = theta
+        self._axicon_angle_degree = 180*theta/pi
 
         if self.longitudinal_wavenumber is not None:
             kz = self.longitudinal_wavenumber
@@ -460,6 +501,15 @@ class BesselBeam(PlaneWave):
 
         if self.wavenumber is not None:
             self.wavenumber = self.wavenumber
+
+    @property
+    def axicon_angle_degree(self):
+        return self.axicon_angle_degree
+
+    @axicon_angle_degree.setter
+    def axicon_angle_degree(self, value):
+        self._axicon_angle_degree = value
+        self.axicon_angle = value*pi/180
 
     @property
     def bessel_order(self):
@@ -477,16 +527,19 @@ class BesselBeam(PlaneWave):
                 * cm.exp(1j*self.bessel_order*point.phi))
 
 
-class GaussianBeam(PlaneWave):
-    params = PlaneWave.params
-    params += ('_q',)
+class GaussianBeam(Beam):
+    intrinsic_params = ('_q',)
+
+    params = Beam.params + intrinsic_params
 
     def __init__(self, **kwargs):
-        PlaneWave.__init__(self)
+        Beam.__init__(self, self)
+
+        self.beams = [self]
 
         self.name = 'gaussian-beam'
 
-        self._q = 1
+        self._q = None
 
         for key, value in kwargs.items():
             if hasattr(self, '_' + key):
@@ -505,17 +558,21 @@ class GaussianBeam(PlaneWave):
     def psi(self, point):
         k = self.wavenumber
         q = self.q
-        return ((1/(1 + 1j*point.z*2*q/k))*cm.exp(1j*point.z*k)
+        return ((1/(1+1j*point.z*2*q/k))*cm.exp(1j*point.z*k)
                 * cm.exp((-q*point.rho**2)/(1+1j*point.z*2*q/k)))
 
 
 class BesselGaussBeam(BesselBeam, GaussianBeam):
-    params = BesselBeam.params
-    params += ('_q',)
+    intrinsic_params = BesselBeam.intrinsic_params
+    intrinsic_params += GaussianBeam.intrinsic_params
+
+    params = Beam.params + intrinsic_params
 
     def __init__(self, **kwargs):
         BesselBeam.__init__(self)
         GaussianBeam.__init__(self)
+
+        self.beams = [self]
 
         self.name = 'bessel-gauss-beam'
 
@@ -544,21 +601,23 @@ class BesselGaussBeam(BesselBeam, GaussianBeam):
 
 
 class BesselGaussBeamSuperposition(BesselGaussBeam):
-    params = BesselGaussBeam.params
-    params += ('_N',
-               '_z_max',
-               '_aperture_radius',
-               '_L',
-               '_qr')
+    intrinsic_params = BesselGaussBeam.intrinsic_params
+
+    intrinsic_params += ('_N',
+                         '_z_max',
+                         '_aperture_radius',
+                         '_L',
+                         '_qr')
+
+    params = Beam.params + intrinsic_params
 
     def __init__(self, **kwargs):
         BesselGaussBeam.__init__(self)
 
+        self.beams = [self]
+
         self.name = 'bessel-gauss-beam-superposition'
 
-        self.beams = []
-
-        self._q = None
         self._N = None
         self._z_max = None
         self._aperture_radius = None
@@ -570,16 +629,6 @@ class BesselGaussBeamSuperposition(BesselGaussBeam):
                 setattr(self, key, value)
 
         self.__create_superposition()
-
-    def __str__(self):
-        out = ''
-        out += str(PlaneWave.__str__(self))
-        for i, beam in enumerate(self.beams):
-            out += ('\n' + 'beam %d (n: %d)' %(i+1, i-len(self.beams)//2))
-            out += '\n    ' + '_amplitude: ' + str(beam.amplitude)
-            out += '\n    ' + '_q: ' + str(beam.q)
-            out += '\n'
-        return out
 
     @property
     def q(self):
@@ -707,23 +756,25 @@ class BesselGaussBeamSuperposition(BesselGaussBeam):
         return sum([beam.psi(point) for beam in self.beams])
 
 
-class FrozenWave(PlaneWave):
-    params = PlaneWave.params
-    params += ('_Q',
-               '_N',
-               '_L',)
+class FrozenWave(Beam):
+    intrinsic_params = ('_Q',
+                        '_N',
+                        '_L',
+                        '_func',)
+
+    params = Beam.params + intrinsic_params
 
     def __init__(self, **kwargs):
-        PlaneWave.__init__(self)
+        Beam.__init__(self, self)
 
         self.name = 'frozen-wave'
 
-        self.beams = []
+        self.beams = [self]
 
         self._Q = None
         self._N = None
         self._L = None
-        self.z_max = None
+        self._func = 'Not defined'
         self.func = None
 
         for key, value in kwargs.items():
@@ -731,23 +782,6 @@ class FrozenWave(PlaneWave):
                 setattr(self, key, value)
 
         self.__create_superposition()
-
-    def __str__(self):
-        out = ''
-        out += str(PlaneWave.__str__(self))
-        for i, beam in enumerate(self.beams):
-            out += ('\n' + 'beam %d (n: %d)' %(i+1, i-len(self.beams)//2))
-            out += '\n    ' + 'amplitude: '
-            out += str(beam.amplitude)
-            out += '\n    ' + 'longitudinal_wavenumber: '
-            out += str(beam.longitudinal_wavenumber)
-            out += '\n    ' + 'transversal_wavenumber: '
-            out += str(beam.transversal_wavenumber)
-            out += '\n    ' + 'axicon_angle: '
-            out += str(beam.axicon_angle) + ' rad / '
-            out += str(beam.axicon_angle*180/pi)  + ' degrees'
-            out += '\n'
-        return out
 
     @property
     def Q(self):
@@ -774,7 +808,6 @@ class FrozenWave(PlaneWave):
     @L.setter
     def L(self, value):
         self._L = value
-        self.z_max = value
         self.__create_superposition()
 
     @property
@@ -784,6 +817,7 @@ class FrozenWave(PlaneWave):
     @reference_function.setter
     def reference_function(self, func):
         self.func = func
+        self._func = "Already defined"
         self.__create_superposition()
 
     def __create_superposition(self):
@@ -818,7 +852,6 @@ class FrozenWave(PlaneWave):
             print(msg)
 
         self.beams = []
-
         for i in range(2*self.N + 1):
             n_index = i - self.N
             beam = BesselBeam()
