@@ -35,6 +35,7 @@ def add_amplitude(psi):
     """ Decorator to add amplitude to all beam 'psi' function """
     @wraps(psi)
     def wrapped(self, point):
+        """ Wrapped function """
         return psi(self, point)*self.amplitude
     return wrapped
 
@@ -42,12 +43,18 @@ def add_phase(psi):
     """ Decorator to add phase to all beam 'psi' function """
     @wraps(psi)
     def wrapped(self, point):
+        """ Wrapped function """
         return psi(self, point)*cm.exp(1j*self.phase)
     return wrapped
 
 
 class Beam(object):
-    generic_params = ('_vacuum_wavelength',
+    """ This class has all properties and methods that a specific beam
+    should have.
+
+    """
+    generic_params = ('_electric_field_direction',
+                      '_vacuum_wavelength',
                       '_vacuum_wavenumber',
                       '_medium_refractive_index',
                       '_wavelength',
@@ -65,6 +72,7 @@ class Beam(object):
         self.name = name
 
         if isinstance(beams, list) is True:
+            self._electric_field_direction = beams[0].electric_field_direction
             self._vacuum_wavelength = beams[0].vacuum_wavelength
             self._vacuum_wavenumber = beams[0].vacuum_wavenumber
             self._medium_refractive_index = beams[0].medium_refractive_index
@@ -77,6 +85,7 @@ class Beam(object):
             self._wavelength = None
             self._wavenumber = None
 
+        self._electric_field_direction = [1, 0, 0]
         self._amplitude = 1
         self._phase = 0
 
@@ -143,6 +152,14 @@ class Beam(object):
     @phase.setter
     def phase(self, value):
         self._phase = value
+
+    @property
+    def electric_field_direction(self):
+        return self._electric_field_direction
+
+    @electric_field_direction.setter
+    def electric_field_direction(self, vector):
+        self._electric_field_direction = vector/np.linalg.norm(vector)
 
     # ----- vacuum -----
 
@@ -304,9 +321,9 @@ class Beam(object):
         fdc = [-1, 9, -45, 0, 45, -9, 1]
 
         # Psi calculated over samples points
-        psix = [self.psi(Point(point.x + i*h, point.y, point.z)) for i in lsp]
-        psiy = [self.psi(Point(point.x, point.y + i*h, point.z)) for i in lsp]
-        psiz = [self.psi(Point(point.x, point.y, point.z + i*h)) for i in lsp]
+        psix = [self.psi(Point([point.x+i*h, point.y, point.z])) for i in lsp]
+        psiy = [self.psi(Point([point.x, point.y+i*h, point.z])) for i in lsp]
+        psiz = [self.psi(Point([point.x, point.y, point.z+i*h])) for i in lsp]
 
         # Psi derivative
         psi_x = np.dot(fdc, psix)/den
@@ -319,17 +336,22 @@ class Beam(object):
         k0y = (psi_y/psi).imag
         k0z = (psi_z/psi).imag
 
-        if ma.isinf(k0x) is True or ma.isnan(k0x) is True:
+        if (ma.isinf(k0x) is True
+                or ma.isinf(k0y) is True
+                or ma.isinf(k0z) is True):
             return [0, 0, 0]
-        if ma.isinf(k0y) is True or ma.isnan(k0y) is True:
-            return [0, 0, 0]
-        if ma.isinf(k0z) is True or ma.isnan(k0z) is True:
+
+        if (ma.isnan(k0x) is True
+                or ma.isnan(k0y) is True
+                or ma.isnan(k0z) is True):
             return [0, 0, 0]
 
         # normalize k0 vector
         if k0x != 0 or k0y != 0 or k0z != 0:
             k = [k0x, k0y, k0z]
-            return k/np.linalg.norm(k)
+            return [k0x/np.linalg.norm(k),
+                    k0y/np.linalg.norm(k),
+                    k0z/np.linalg.norm(k)]
         else:
             return [0, 0, 1]
 
@@ -604,7 +626,7 @@ class BesselGaussBeamSuperposition(BesselGaussBeam):
     intrinsic_params = BesselGaussBeam.intrinsic_params
 
     intrinsic_params += ('_N',
-                         '_z_max',
+                         '_zmax',
                          '_aperture_radius',
                          '_L',
                          '_qr')
@@ -619,7 +641,7 @@ class BesselGaussBeamSuperposition(BesselGaussBeam):
         self.name = 'bessel-gauss-beam-superposition'
 
         self._N = None
-        self._z_max = None
+        self._zmax = None
         self._aperture_radius = None
         self._L = None
         self._qr = None
@@ -649,18 +671,18 @@ class BesselGaussBeamSuperposition(BesselGaussBeam):
         self.__create_superposition()
 
     @property
-    def z_max(self):
-        return self._z_max
+    def zmax(self):
+        return self._zmax
 
-    @z_max.setter
-    def z_max(self, value):
-        self._z_max = value
+    @zmax.setter
+    def zmax(self, value):
+        self._zmax = value
         if (self.axicon_angle is None
                 and self.aperture_radius is not None):
-            self.axicon_angle = ma.atan(self.aperture_radius/self.z_max)
+            self.axicon_angle = ma.atan(self.aperture_radius/self.zmax)
         if (self.axicon_angle is not None
                 and self.aperture_radius is None):
-            self.aperture_radius = (self.z_max*ma.tan(self.axicon_angle))
+            self.aperture_radius = (self.zmax*ma.tan(self.axicon_angle))
 
         self.__create_superposition()
 
@@ -673,11 +695,11 @@ class BesselGaussBeamSuperposition(BesselGaussBeam):
         self._aperture_radius = value
         self.L = 3*value**2
 
-        if self.axicon_angle is None and self.z_max is not None:
-            self.axicon_angle = ma.atan(value/self.z_max)
+        if self.axicon_angle is None and self.zmax is not None:
+            self.axicon_angle = ma.atan(value/self.zmax)
 
-        if self.axicon_angle is not None and self.z_max is None:
-            self.z_max = value/ma.tan(self.axicon_angle)
+        if self.axicon_angle is not None and self.zmax is None:
+            self.zmax = value/ma.tan(self.axicon_angle)
 
         self.__create_superposition()
 
@@ -688,6 +710,8 @@ class BesselGaussBeamSuperposition(BesselGaussBeam):
     @axicon_angle.setter
     def axicon_angle(self, theta):
         self._axicon_angle = theta
+        self._axicon_angle_degree = 180*theta/pi
+
 
         if self.longitudinal_wavenumber is not None:
             kz = self.longitudinal_wavenumber
@@ -699,11 +723,11 @@ class BesselGaussBeamSuperposition(BesselGaussBeam):
             if theta != 0:
                 self.wavenumber = krho/ma.sin(theta)
 
-        if self.z_max is None and self.aperture_radius is not None:
-            self.z_max = self.aperture_radius/ma.tan(theta)
+        if self.zmax is None and self.aperture_radius is not None:
+            self.zmax = self.aperture_radius/ma.tan(theta)
 
-        if self.z_max is not None and self.aperture_radius is None:
-            self.aperture_radius = self.z_max*ma.tan(theta)
+        if self.zmax is not None and self.aperture_radius is None:
+            self.aperture_radius = self.zmax*ma.tan(theta)
 
         if self.wavenumber is not None:
             self.wavenumber = self.wavenumber
@@ -828,8 +852,8 @@ class FrozenWave(Beam):
         def amplitude_n(n):
             func_real = lambda z: (self.func(z)*cm.exp(-2j*pi*z*n/self.L)).real
             func_imag = lambda z: (self.func(z)*cm.exp(-2j*pi*z*n/self.L)).imag
-            an_real, err = quad(func_real, 0, self.L)
-            an_imag, err = quad(func_imag, 0, self.L)
+            an_real, err = quad(func_real, -self.L/2, self.L/2)
+            an_imag, err = quad(func_imag, -self.L/2, self.L/2)
             return (an_real + 1j*an_imag)/self.L
 
         if 2*pi*self.N/self.L > self.wavenumber/2:
@@ -868,27 +892,30 @@ class FrozenWave(Beam):
 
 
 class Point(object):
-    def __init__(self, v1, v2, v3, system='cart'):
-        if system == 'cart':
+    def __init__(self, vector, system='cartesian'):
+        v1 = vector[0]
+        v2 = vector[1]
+        v3 = vector[2]
+        if system == 'cartesian':
             self.__init(v1, v2, v3)
 
-        elif system == 'cilin':
+        elif system == 'cylindrical':
             self.__init(v1*ma.cos(v2), v1*ma.sin(v2), v3)
 
-        elif system == 'spher':
+        elif system == 'spherical':
             self.__init(v1*ma.sin(v2)*ma.cos(v3),
                         v1*ma.sin(v2)*ma.sin(v3),
                         v1*ma.cos(v2))
 
         else:
             raise NameError('System not defined. Choose amoung '
-                            + '"cart", "cilin" or "spher".')
+                            + '"cartesian", "cylindrical" or "spherical".')
 
     def __add__(self, other):
         x = self.x + other.x
         y = self.y + other.y
         z = self.z + other.z
-        return Point(x, y, z)
+        return Point([x, y, z])
 
     def __radd__(self, other):
         if other == 0:
@@ -900,14 +927,14 @@ class Point(object):
         x = self.x - other.x
         y = self.y - other.y
         z = self.z - other.z
-        return Point(x, y, z)
+        return Point([x, y, z])
 
     def __str__(self):
-        return ("Cart = (%s, %s, %s)."
+        return ("cartesian = (%s, %s, %s)."
                 % (str(self.x), str(self.y), str(self.z)) + '\n'
-                + "Cilin = (%s, %s, %s)."
+                + "cylindrical = (%s, %s, %s)."
                 % (str(self.rho), str(self.phi), str(self.z)) + '\n'
-                + "Spher = (%s, %s, %s)."
+                + "spherical = (%s, %s, %s)."
                 % (str(self.r), str(self.theta), str(self.phi)))
 
     def __init(self, x, y, z):
@@ -916,7 +943,7 @@ class Point(object):
         self.y = y
         self.z = z
 
-        # cilindrical
+        # cylindrical
         self.rho = ma.sqrt(x**2 + y**2)
         if x != 0:
             self.phi = ma.atan(y/x)
@@ -942,6 +969,15 @@ class Point(object):
 
     def normalize(self):
         return [self.x/self.r, self.y/self.r, self.z/self.r]
+
+    def cartesian(self):
+        return [self.x, self.y, self.z]
+
+    def cylindrical(self):
+        return [self.rho, self.phi, self.z]
+
+    def spherical(self):
+        return [self.r, self.theta, self.phi]
 
 
 if __name__ == "__main__":
