@@ -259,7 +259,7 @@ class Beam(object):
         return True
 
     def psi(self, point):
-        return (self.amplitude*cm.exp(1j*self.phase)
+        return (self._amplitude*cm.exp(1j*self._phase)
                 *sum([beam.psi(point) for beam in self.beams]))
 
     def intensity(self, point):
@@ -367,8 +367,8 @@ class PlaneWave(Beam):
                 red on beam class.
 
         """
-        return (self.amplitude*cm.exp(1j*self.phase)
-                *cm.exp(1j*self.wavenumber*point.z))
+        return (self._amplitude*cm.exp(1j*self._phase)
+                *cm.exp(1j*self._wavenumber*point.z))
 
 
 class BesselBeam(Beam):
@@ -524,11 +524,11 @@ class BesselBeam(Beam):
         self._bessel_order = value
 
     def psi(self, point):
-        return (self.amplitude*cm.exp(1j*self.phase)
-                *ss.jv(self.bessel_order,
-                       self.transversal_wavenumber*point.rho)
-                * cm.exp(1j*self.longitudinal_wavenumber*point.z)
-                * cm.exp(1j*self.bessel_order*point.phi))
+        return (self._amplitude*cm.exp(1j*self._phase)
+                *ss.jv(self._bessel_order,
+                       self._transversal_wavenumber*point.rho)
+                * cm.exp(1j*self._longitudinal_wavenumber*point.z)
+                * cm.exp(1j*self._bessel_order*point.phi))
 
 
 class GaussianBeam(Beam):
@@ -558,9 +558,9 @@ class GaussianBeam(Beam):
         self._q = q
 
     def psi(self, point):
-        k = self.wavenumber
-        q = self.q
-        return (self.amplitude*cm.exp(1j*self.phase)
+        k = self._wavenumber
+        q = self._q
+        return (self._amplitude*cm.exp(1j*self._phase)
                 *(1/(1+1j*point.z*2*q/k))*cm.exp(1j*point.z*k)
                 * cm.exp((-q*point.rho**2)/(1+1j*point.z*2*q/k)))
 
@@ -584,9 +584,9 @@ class BesselGaussBeam(BesselBeam, GaussianBeam):
                 setattr(self, key, value)
 
     def psi(self, point):
-        q = self.q
-        k = self.wavenumber
-        krho = self.transversal_wavenumber
+        q = self._q
+        k = self._wavenumber
+        krho = self._transversal_wavenumber
 
         if point.z != 0:
             Q = q - 1j*k/(2*point.z)
@@ -600,7 +600,7 @@ class BesselGaussBeam(BesselBeam, GaussianBeam):
         else:
             value = ss.jv(0, krho*point.rho)*cm.exp(-q*point.rho**2)
 
-        return self.amplitude*cm.exp(1j*self.phase)*value
+        return self._amplitude*cm.exp(1j*self._phase)*value
 
 
 class BesselGaussBeamSuperposition(BesselGaussBeam):
@@ -756,7 +756,7 @@ class BesselGaussBeamSuperposition(BesselGaussBeam):
             self.beams.append(beam)
 
     def psi(self, point):
-        return (self.amplitude*cm.exp(1j*self.phase)
+        return (self._amplitude*cm.exp(1j*self._phase)
                 *sum([beam.psi(point) for beam in self.beams]))
 
 
@@ -866,7 +866,7 @@ class FrozenWave(Beam):
             self.beams.append(beam)
 
     def psi(self, point):
-        return (self.amplitude*cm.exp(1j*self.phase)
+        return (self._amplitude*cm.exp(1j*self._phase)
                 *sum([beam.psi(point) for beam in self.beams]))
 
 
