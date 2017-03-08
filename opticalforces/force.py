@@ -2,7 +2,6 @@ import math as ma
 from math import pi
 import cmath as cm
 from numbers import Number
-from scipy.integrate import dblquad
 from scipy.integrate import simps
 from astropy.table import Table
 import numpy as np
