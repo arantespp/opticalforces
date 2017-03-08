@@ -3,13 +3,15 @@ from math import pi
 import cmath as cm
 from numbers import Number
 from scipy.integrate import dblquad
+from scipy.integrate import simps
 from astropy.table import Table
 import numpy as np
-from time import time
+import time
 
 from beam import Point
 from plots import *
 
+import pyperclip
 
 # Speed of light.
 speed_of_light = 299792458
@@ -27,9 +29,9 @@ def round_sig(num, sig=4):
 def timing(func):
     @wraps(func)
     def wrapped(*args, **kwargs):
-        t0 = time()
+        t0 = time.time()
         F = func(*args, **kwargs)
-        print('time:', time() - t0)
+        print('time:', time.time() - t0)
         return F
     return wrapped
 
@@ -209,10 +211,13 @@ class SphericalParticle(object):
         self._incident_ray = vector
         self._incident_ray_abs = np.linalg.norm(vector)
         self._incident_ray_power = np.linalg.norm(vector)
-        if self._incident_ray_abs != 0:
-            self._incident_ray_direction = vector/np.linalg.norm(vector)
+        if self._incident_ray_abs >= 1e-99:
+            self._incident_ray_direction = [v/np.linalg.norm(vector)
+                                            for v in vector]
         else:
             self._incident_ray_direction = [0, 0, 0]
+            self._incident_ray_abs = 0
+            self._incident_ray_power = 0
 
     @property
     def incident_ray_abs(self):
@@ -233,13 +238,14 @@ class SphericalParticle(object):
     @electric_field_direction.setter
     def electric_field_direction(self, vector):
         if np.linalg.norm(vector) != 0:
-            self._electric_field_direction = vector/np.linalg.norm(vector)
+            self._electric_field_direction = [v/np.linalg.norm(vector)
+                                              for v in vector]
         else:
             self._electric_field_direction = [0, 0, 0]
 
-    # Vector normal to surface point where a single ray hits.
     @staticmethod
     def normal(theta, phi):
+        """ Vector normal to surface point where a single ray hits. """
         if theta == 0:
             return [0, 0, 1]
         elif theta == pi:
@@ -253,29 +259,34 @@ class SphericalParticle(object):
         normal = self.normal(theta, phi)
         return ma.acos(-np.dot(self.incident_ray_direction, normal))
 
-    def ortogonal_incident_ray(self, theta, phi):
+    def ortonormal_incident_ray(self, theta, phi):
         k0 = self.incident_ray_direction
         normal = self.normal(theta, phi)
         dot = np.dot(k0, normal)
         if dot == 0:
             return [0, 0, 0]
-        else:
-            d0 = [n-k for n, k in zip(normal, [dot*k for k in k0])]
-            if np.linalg.norm(d0) != 0:
-                return d0/np.linalg.norm(d0)
-            else:
-                return [0, 0, 0]
+
+        d0 = [n-k for n, k in zip(normal, [dot*k for k in k0])]
+
+        if np.linalg.norm(d0) == 0:
+            return [0, 0, 0]
+
+        return [d/np.linalg.norm(d0) for d in d0]
 
     def crossing_angle(self, theta, phi):
+        """ Crossing angle between the polarization direction of the
+        incident beam and the normal vector of the incident plane."""
+
         k0 = self.incident_ray_direction
         ef0 = self.electric_field_direction
         n0 = self.normal(theta, phi)
         plane_normal = np.cross(k0, n0)
-        if np.linalg.norm(plane_normal) != 0:
-            plane_normal /= np.linalg.norm(plane_normal)
-            return ma.acos(abs(np.dot(ef0, plane_normal)))
-        else:
+
+        if np.linalg.norm(plane_normal) == 0:
             return 0
+
+        plane_normal /= np.linalg.norm(plane_normal)
+        return ma.acos(abs(np.dot(ef0, plane_normal)))
 
     def refracted_angle(self, theta, phi):
         incident_angle = self.incident_angle(theta, phi)
@@ -284,10 +295,6 @@ class SphericalParticle(object):
                        /self.refractive_index).real
 
     def reflectance(self, theta, phi):
-        # Crossing angle between the polarization direction of
-        # the incident beam and the normal vector of the incident
-        # plane.
-
         thetai = self.incident_angle(theta, phi)
         thetar = self.refracted_angle(theta, phi)
         beta = self.crossing_angle(theta, phi)
@@ -320,11 +327,8 @@ class SphericalParticle(object):
 
         k0 = self.incident_ray
         thetai = self.incident_angle(theta, phi)
+        d0 = self.ortonormal_incident_ray(theta, phi)
 
-        if abs(thetai) >= pi/2:
-            return [0, 0, 0]
-
-        d0 = self.ortogonal_incident_ray(theta, phi)
         rotation = cm.exp(1j*(pi-2*thetai))
         a_k0, a_d0 = rotation.real, rotation.imag
         ref_ray = [a_k0*k + a_d0*d for k, d in zip(k0, d0)]
@@ -338,12 +342,8 @@ class SphericalParticle(object):
 
         k0 = self.incident_ray
         thetai = self.incident_angle(theta, phi)
-
-        if abs(thetai) >= pi/2:
-            return [0, 0, 0]
-
         thetar = self.refracted_angle(theta, phi)
-        d0 = self.ortogonal_incident_ray(theta, phi)
+        d0 = self.ortonormal_incident_ray(theta, phi)
         R = self.reflectance(theta, phi)
         # Distance travelled by a single ray before and after hit
         # sphere's surface.
@@ -363,12 +363,8 @@ class SphericalParticle(object):
 
         k0 = self.incident_ray
         thetai = self.incident_angle(theta, phi)
-
-        if abs(thetai) >= pi/2:
-            return [0, 0, 0]
-
         thetar = self.refracted_angle(theta, phi)
-        d0 = self.ortogonal_incident_ray(theta, phi)
+        d0 = self.ortonormal_incident_ray(theta, phi)
         R = self.reflectance(theta, phi)
         # Distance travelled by a single ray before and after hit
         # sphere's surface.
@@ -389,12 +385,8 @@ class SphericalParticle(object):
 
         k0 = self.incident_ray
         thetai = self.incident_angle(theta, phi)
-
-        if abs(thetai) >= pi/2:
-            return 0, 0
-
         thetar = self.refracted_angle(theta, phi)
-        d0 = self.ortogonal_incident_ray(theta, phi)
+        d0 = self.ortonormal_incident_ray(theta, phi)
         R = self.reflectance(theta, phi)
         # Distance travelled by a single ray before and after hit
         # sphere's surface.
@@ -439,11 +431,7 @@ class SphericalParticle(object):
 
         k0 = self.incident_ray_direction
         thetai = self.incident_angle(theta, phi)
-
-        if abs(thetai) >= pi/2:
-            return [0, 0, 0]
-
-        d0 = self.ortogonal_incident_ray(theta, phi)
+        d0 = self.ortonormal_incident_ray(theta, phi)
         Qk, Qd = self.Qkd(theta, phi)
 
         f = [Qk*k + Qd*d for k, d in zip(k0, d0)]
@@ -496,13 +484,11 @@ class Force(object):
             ('Particle radius length less than 10 * wavelength')
 
         ptc.electric_field_direction = beam.electric_field_direction
-        open("values.txt", 'w').close()
 
-        # Return each infinitesimal sphere surface force contribuition,
-        # in other words, the force integral over sphere surface's
-        # integrand value as function of theta and phi, which are par-
-        # ticle coordinates.
         def integrand(theta, phi):
+            """ Return each infinitesimal force contribuition on sphere
+            surface as function of theta and phi at particle
+            coordinates."""
 
             # Beam particle surface: beam coordinates point that
             # match the point at theta and phi on particle surface.
@@ -515,14 +501,16 @@ class Force(object):
             power = beam.intensity(bps)
 
             # Incident ray: vector k0 plus its power (intensity)
-            incident_ray = [power*k for k in k0]
+            ptc.incident_ray = [power*k for k in k0]
 
-            ptc.incident_ray = incident_ray
+            # Check if is a valid condition
+            if ptc.incident_angle(theta, phi) >= pi/2:
+                return {'fx': 0, 'fy': 0, 'fz': 0, 'dA': 0}
 
             # Force of a single ray.
             force = ptc.force_ray(theta, phi)
 
-            msg = ''
+            '''msg = ''
             msg += 'np=' + str(ptc.refractive_index) + ';\n'
             msg += 'nm=' + str(ptc.medium_refractive_index) + ';\n'
             msg += 'Rp=' + str(ptc.radius) + ';\n'
@@ -531,96 +519,68 @@ class Force(object):
             msg += 'theta=' + str(theta) + ';\n'
             msg += 'phi=' + str(phi) + ';\n'
             msg += 'n0=List' + str(ptc.normal(theta, phi)) + ';\n'
-            msg += 'k0=List' + str(list(ptc.incident_ray_direction)) + ';\n'
+            msg += 'k0=List' + str(list(k0)) + ';\n'
             msg += 'E0=List' + str(list(ptc.electric_field_direction)) + ';\n'
             msg += 'beta=' + str(ptc.crossing_angle(theta, phi)) + ';\n'
             msg += 'thetai=' + str(ptc.incident_angle(theta, phi)) + ';\n'
             msg += 'thetar=' + str(ptc.refracted_angle(theta, phi))  + ';\n'
-            msg += 'd0=List' + str(list(ptc.ortogonal_incident_ray(theta, phi))) + ';\n'
+            msg += 'd0=List' + str(list(ptc.ortonormal_incident_ray(theta, phi))) + ';\n'
             msg += 'R=' + str(ptc.reflectance(theta, phi)) + ';\n'
-            #msg += 'T: ' + str(ptc.transmittance(theta, phi)) + '\n'
-            #print('ref-ray', ptc.reflected_ray(theta, phi))
-            #print('internal-ray', ptc.internal_ray(theta, phi, n=1))
-            #print('refracted-ray', ptc.refracted_ray(theta, phi, n=1))
             msg += 'Qkd=List' + str(list(ptc.Qkd(theta, phi))) + ';\n'
-            #msg += 'psi=' + str(beam.psi(bps)) + ';\n'
             msg += 'intensity=' + str(beam.intensity(bps)) + ';\n'
             msg += 'Force=List' + str(list(force)) + ';\n'
-
-            msg += str('\n')
-
+            msg = msg.replace('e-', '*10^-')
+            pyperclip.copy(msg)
+            pyperclip.paste()
             print(msg)
+            time.sleep(1)'''
 
-            with open("values.txt", 'a') as f:
-                f.write(msg.replace('e-', '*10^-'))
+            return {'fx': force[0]*ma.sin(theta),
+                    'fy': force[1]*ma.sin(theta),
+                    'fz': force[2]*ma.sin(theta),
+                    'dA': ma.sin(theta)}
 
-            # Return [[Integrand value], [dA]]
-            return [f*ma.sin(theta) for f in force]
+        def integration():
+            nptheta = 301
 
+            theta_list = np.linspace(0, pi, nptheta)
 
-        # Effective area's element. Some regions are not illuminated
-        # by beam, therefore, this function returns only element of
-        # area that is illuminated.
-        def effective_dA(theta, phi):
-            # Beam particle surface: beam coordinates point that
-            # match the point at theta and phi on particle surface.
-            bps = Point([ptc.radius, theta, phi], 'spherical') + ptc_pos
+            fx_theta_integral = []
+            fy_theta_integral = []
+            fz_theta_integral = []
+            dA_theta_integral = []
+            for theta in theta_list:
+                phi_list = np.linspace(0, 2*pi,
+                                       ma.floor(nptheta*ma.sin(theta)+1))
+                fx_phi_integral = []
+                fy_phi_integral = []
+                fz_phi_integral = []
+                dA_phi_integral = []
+                for phi in phi_list:
+                    values = integrand(theta, phi)
+                    fx_phi_integral.append(values['fx'])
+                    fy_phi_integral.append(values['fy'])
+                    fz_phi_integral.append(values['fz'])
+                    dA_phi_integral.append(values['dA'])
+                fx_theta_integral.append(simps(fx_phi_integral, phi_list))
+                fy_theta_integral.append(simps(fy_phi_integral, phi_list))
+                fz_theta_integral.append(simps(fz_phi_integral, phi_list))
+                dA_theta_integral.append(simps(dA_phi_integral, phi_list))
 
-            # Vector parallel to the direction of a single ray.
-            ptc.incident_ray = beam.wavenumber_direction(bps)
+            eff_area = simps(dA_theta_integral, theta_list)
+            fx = simps(fx_theta_integral, theta_list)/eff_area
+            fy = simps(fy_theta_integral, theta_list)/eff_area
+            fz = simps(fz_theta_integral, theta_list)/eff_area
 
-            # Incident angle.
-            thetai = ptc.incident_angle(theta, phi)
+            return [fx, fy, fz]
 
-            # If incidente angle is breater than pi/2, means that a ray
-            # at specific point actually does not hit there. So, there
-            # is no force contribuition.
-            if thetai >= pi/2:
-                return 0
-            else:
-                return ma.sin(theta)
-
-        # integral over semisphere surface
-        def force_times_surface(forceDirection):
-            if forceDirection == 'fx':
-                fd = 0
-            elif forceDirection == 'fy':
-                fd = 1
-            elif forceDirection == 'fz':
-                fd = 2
-            else:
-                raise 'Direction not defined'
-
-            f, err = dblquad(lambda theta, phi: integrand(theta, phi)[fd],
-                             0,  # phi initial
-                             2*pi,  # phi final
-                             lambda theta: pi/2,  # theta initial
-                             lambda theta: pi,  # theta final
-                             epsabs=1.49e-08,
-                             epsrel=1.49e-08)
-            return f
-
-        # Effective surface which is illuminated.
-        A, err = dblquad(effective_dA,
-                         0,  # phi initial
-                         2*pi,  # phi final
-                         lambda theta: pi/2,  # theta initial
-                         lambda theta: pi,  # theta final
-                         epsabs=1.49e-08,
-                         epsrel=1.49e-08)
-
-        # Forces
-        fx = force_times_surface('fx')/A
-        fy = force_times_surface('fy')/A
-        fz = force_times_surface('fz')/A
-
-        return [fx, fy, fz]
+        return integration()
 
 
 if __name__ == '__main__':
     print("Please, visit: https://github.com/arantespp/opticalforces")
 
-    Rp = 17.5e-6
+    '''Rp = 17.5e-6
 
     ptc = SphericalParticle(radius=Rp,
                             medium_refractive_index=1.33,
@@ -634,7 +594,7 @@ if __name__ == '__main__':
     print('n0:', ptc.normal(theta, phi))
     print('thetai:', ptc.incident_angle(theta, phi)*180/pi)
     print('thetar:', ptc.refracted_angle(theta, phi)*180/pi)
-    print('d0:', ptc.ortogonal_incident_ray(theta, phi))
+    print('d0:', ptc.ortonormal_incident_ray(theta, phi))
     print('beta:', ptc.crossing_angle(theta, phi)*180/pi)
     print('R:', ptc.reflectance(theta, phi))
     print('T:', ptc.transmittance(theta, phi))
@@ -642,4 +602,51 @@ if __name__ == '__main__':
     print('internal-ray', ptc.internal_ray(theta, phi, n=1))
     print('refracted-ray', ptc.refracted_ray(theta, phi, n=1))
     print('Qk, Qd:', ptc.Qkd(theta, phi))
-    print('Force:', ptc.force_ray(theta, phi))
+    print('Force:', ptc.force_ray(theta, phi))'''
+
+    '''def surface(theta, phi):
+        return [1*ma.sin(theta), 2*ma.sin(theta), 3*ma.sin(theta)], ma.sin(theta)
+
+    npphi = 20
+    nptheta = 40
+
+    phi_list = np.linspace(0, 2*pi, npphi)
+    theta_list = np.linspace(0, pi, nptheta)
+
+    force_ray_matrix = []
+
+    for phi in phi_list:
+        force_theta = []
+        for theta in theta_list:
+            #print(surface(theta, phi)[1])
+            force_theta.append(surface(theta, phi)[1])
+        force_ray_matrix.append(force_theta)
+
+    asd = [simps(theta_row, theta_list) for theta_row in force_ray_matrix]
+    #print(asd)
+    s = simps(asd, phi_list)'''
+
+    from beam import FrozenWave
+
+    fw = FrozenWave()
+
+    def func(z):
+        if -0.1*1*1e-3 < z  and z < 0.1*1*1e-3:
+            return 1
+        else:
+            return 0
+
+    fw.vacuum_wavelength = 1064e-9
+    fw.medium_refractive_index = 1.33
+    fw.N = 15
+    fw.L = 1*1e-3
+    fw.R = 17.5e-6
+    fw.Q = 0.95*fw.wavenumber
+    fw.reference_function = func
+
+    Rp = 17.5e-6
+
+    ptc = SphericalParticle(radius=Rp, medium_refractive_index=1.33,
+                            refractive_index=1.010*1.33)
+
+    print(Force.geo_opt(fw, ptc, Point([0, 0, -0.01])))
