@@ -159,7 +159,8 @@ class Beam(object):
 
     @electric_field_direction.setter
     def electric_field_direction(self, vector):
-        self._electric_field_direction = vector/np.linalg.norm(vector)
+        self._electric_field_direction = [v/np.linalg.norm(vector)
+                                          for v in vector]
 
     # ----- vacuum -----
 
