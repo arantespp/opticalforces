@@ -580,52 +580,6 @@ class Force(object):
 if __name__ == '__main__':
     print("Please, visit: https://github.com/arantespp/opticalforces")
 
-    '''Rp = 17.5e-6
-
-    ptc = SphericalParticle(radius=Rp,
-                            medium_refractive_index=1.33,
-                            refractive_index=1.010*1.33)
-
-    theta = 3*pi/4
-    phi = 0
-    ptc.incident_ray = [0, 0, 10]
-    ptc.electric_field_direction = [0, 2, 0]
-    print('k0:', ptc.incident_ray_direction)
-    print('n0:', ptc.normal(theta, phi))
-    print('thetai:', ptc.incident_angle(theta, phi)*180/pi)
-    print('thetar:', ptc.refracted_angle(theta, phi)*180/pi)
-    print('d0:', ptc.ortonormal_incident_ray(theta, phi))
-    print('beta:', ptc.crossing_angle(theta, phi)*180/pi)
-    print('R:', ptc.reflectance(theta, phi))
-    print('T:', ptc.transmittance(theta, phi))
-    print('ref-ray', ptc.reflected_ray(theta, phi))
-    print('internal-ray', ptc.internal_ray(theta, phi, n=1))
-    print('refracted-ray', ptc.refracted_ray(theta, phi, n=1))
-    print('Qk, Qd:', ptc.Qkd(theta, phi))
-    print('Force:', ptc.force_ray(theta, phi))'''
-
-    '''def surface(theta, phi):
-        return [1*ma.sin(theta), 2*ma.sin(theta), 3*ma.sin(theta)], ma.sin(theta)
-
-    npphi = 20
-    nptheta = 40
-
-    phi_list = np.linspace(0, 2*pi, npphi)
-    theta_list = np.linspace(0, pi, nptheta)
-
-    force_ray_matrix = []
-
-    for phi in phi_list:
-        force_theta = []
-        for theta in theta_list:
-            #print(surface(theta, phi)[1])
-            force_theta.append(surface(theta, phi)[1])
-        force_ray_matrix.append(force_theta)
-
-    asd = [simps(theta_row, theta_list) for theta_row in force_ray_matrix]
-    #print(asd)
-    s = simps(asd, phi_list)'''
-
     from beam import FrozenWave
 
     fw = FrozenWave()
