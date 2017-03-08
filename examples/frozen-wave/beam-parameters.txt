@@ -1,297 +1,292 @@
 name: frozen-wave
     _amplitude: 1
     _phase: 0
-    _beta: 0
-    _wavelength: 1.064e-06
-    _k: 7853981.633974482
-    _nm: 1.33
-    _Q: 7727400.0
-    _N: 20
+    _electric_field_direction: [1, 0, 0]
+    _vacuum_wavelength: 1.064e-06
+    _vacuum_wavenumber: 5905249.348852994
+    _medium_refractive_index: 1.33
+    _wavelength: 8.000000000000001e-07
+    _wavenumber: 7853981.633974482
+    _Q: 7461282.552275758
+    _N: 15
     _L: 0.001
+    _func: Already defined
 
-beam 1 (n: -20)
-    An: (1.2285734250913214e-08+6.467031533694154e-09j)
-    k: 7853981.633974482
-    kzn: 7601736.293856408
-    khron: 1974495.5876057842
-    thetan: 0.25412704519315893
+beam 1 (-15): bessel-beam
+    _amplitude: (6.914223448785904e-09+0j)
+    _phase: 0
+    _longitudinal_wavenumber: 7367034.772668065
+    _transversal_wavenumber: 2722466.926357064
+    _axicon_angle: 0.3539815669724723
+    _axicon_angle_degree: 20.281649812950157
+    _bessel_order: 0
 
-beam 2 (n: -19)
-    An: (0.0014706753548539252-0.005177007534248524j)
-    k: 7853981.633974482
-    kzn: 7608019.479163588
-    khron: 1950145.407777554
-    thetan: 0.25092513197536137
+beam 2 (-14): bessel-beam
+    _amplitude: (0.013364130330217263+0j)
+    _phase: 0
+    _longitudinal_wavenumber: 7373317.957975244
+    _transversal_wavenumber: 2705403.814111352
+    _axicon_angle: 0.35166641143500804
+    _axicon_angle_degree: 20.149001171737112
+    _bessel_order: 0
 
-beam 3 (n: -18)
-    An: (0.01681837253390025-0.04083239534770123j)
-    k: 7853981.633974482
-    kzn: 7614302.6644707685
-    khron: 1925466.8110985043
-    thetan: 0.24768271274062223
+beam 3 (-13): bessel-beam
+    _amplitude: (0.023286976492419245+0j)
+    _phase: 0
+    _longitudinal_wavenumber: 7379601.143282424
+    _transversal_wavenumber: 2688217.7130718445
+    _axicon_angle: 0.34933655479479053
+    _axicon_angle_degree: 20.01551021938212
+    _bessel_order: 0
 
-beam 4 (n: -17)
-    An: (0.02716974270455085+0.015148143788917916j)
-    k: 7853981.633974482
-    kzn: 7620585.849777947
-    khron: 1900447.0034632909
-    thetan: 0.24439817473844308
+beam 4 (-12): bessel-beam
+    _amplitude: (0.02522755737950834+0j)
+    _phase: 0
+    _longitudinal_wavenumber: 7385884.328589603
+    _transversal_wavenumber: 2670906.2491040346
+    _axicon_angle: 0.3469917004967371
+    _axicon_angle_degree: 19.881159964530546
+    _bessel_order: 0
 
-beam 5 (n: -16)
-    An: (0.01169361425778463+0.03598925115495241j)
-    k: 7853981.633974482
-    kzn: 7626869.035085127
-    khron: 1875072.32619655
-    thetan: 0.24106979580135945
+beam 5 (-11): bessel-beam
+    _amplitude: (0.017008895577595315+0j)
+    _phase: 0
+    _longitudinal_wavenumber: 7392167.513896783
+    _transversal_wavenumber: 2653466.96857103
+    _axicon_angle: 0.3446315419827945
+    _axicon_angle_degree: 19.745932842699766
+    _bessel_order: 0
 
-beam 6 (n: -15)
-    An: (-0.01060997352963348+0.03183098595633035j)
-    k: 7853981.633974482
-    kzn: 7633152.220392306
-    khron: 1849328.171831186
-    thetan: 0.23769573366722396
+beam 6 (-10): bessel-beam
+    _amplitude: (-9.78519510389083e-11+0j)
+    _phase: 0
+    _longitudinal_wavenumber: 7398450.699203962
+    _transversal_wavenumber: 2635897.334544135
+    _axicon_angle: 0.3422557622135262
+    _axicon_angle_degree: 19.60981068886813
+    _bessel_order: 0
 
-beam 7 (n: -14)
-    An: (-0.013364130330217194-0.02707869119356903j)
-    k: 7853981.633974482
-    kzn: 7639435.405699486
-    khron: 1823198.8890281855
-    thetan: 0.2342740139234754
+beam 7 (-9): bessel-beam
+    _amplitude: (-0.02078862918465582+0j)
+    _phase: 0
+    _longitudinal_wavenumber: 7404733.884511142
+    _transversal_wavenumber: 2618194.722777702
+    _axicon_angle: 0.339864033159885
+    _axicon_angle_degree: 19.47277470835567
+    _bessel_order: 0
 
-beam 8 (n: -13)
-    An: (-0.011044288562273383+0.019809199563136568j)
-    k: 7853981.633974482
-    kzn: 7645718.591006666
-    khron: 1796667.674875775
-    thetan: 0.23080251634962076
+beam 8 (-8): bessel-beam
+    _amplitude: (-0.03784133652226648+0j)
+    _phase: 0
+    _longitudinal_wavenumber: 7411017.069818322
+    _transversal_wavenumber: 2600356.4174301066
+    _axicon_angle: 0.3374560152628656
+    _axicon_angle_degree: 19.334805445864493
+    _bessel_order: 0
 
-beam 9 (n: -12)
-    An: (-0.02522755737950849+0.018328787570894366j)
-    k: 7853981.633974482
-    kzn: 7652001.776313845
-    khron: 1769716.452457352
-    thetan: 0.227278959389894
+beam 9 (-7): bessel-beam
+    _amplitude: (-0.043247241557549304+0j)
+    _phase: 0
+    _longitudinal_wavenumber: 7417300.255125501
+    _transversal_wavenumber: 2582379.60651095
+    _axicon_angle: 0.3350313568585269
+    _axicon_angle_degree: 19.19588275253496
+    _bessel_order: 0
 
-beam 10 (n: -11)
-    An: (-0.0314775267677681-0.00894210663805917j)
-    k: 7853981.633974482
-    kzn: 7658284.961621025
-    khron: 1742325.7311472313
-    thetan: 0.22370088243337768
+beam 10 (-6): bessel-beam
+    _amplitude: (-0.031182975981352112+0j)
+    _phase: 0
+    _longitudinal_wavenumber: 7423583.440432681
+    _transversal_wavenumber: 2564261.377032801
+    _axicon_angle: 0.3325896935656255
+    _axicon_angle_degree: 19.055985750859694
+    _bessel_order: 0
 
-beam 11 (n: -10)
-    An: (3.0740954469535705e-09-0.09549296507929145j)
-    k: 7853981.633974482
-    kzn: 7664568.146928204
-    khron: 1714474.4465584874
-    thetan: 0.22006562551092437
+beam 11 (-5): bessel-beam
+    _amplitude: (1.7684639574791238e-08+0j)
+    _phase: 0
+    _longitudinal_wavenumber: 7429866.62573986
+    _transversal_wavenumber: 2545998.7098436365
+    _axicon_angle: 0.3301306476328511
+    _axicon_angle_degree: 18.91509279728291
+    _bessel_order: 0
 
-beam 12 (n: -9)
-    An: (0.03847253210539123-0.010929240151955373j)
-    k: 7853981.633974482
-    kzn: 7670851.332235384
-    khron: 1686139.7763978872
-    thetan: 0.2163703059331737
+beam 12 (-4): bessel-beam
+    _amplitude: (0.04677446000184015+0j)
+    _phase: 0
+    _longitudinal_wavenumber: 7436149.81104704
+    _transversal_wavenumber: 2527588.4741139226
+    _axicon_angle: 0.3276538272423566
+    _axicon_angle_degree: 18.77318144229563
+    _bessel_order: 0
 
-beam 13 (n: -8)
-    An: (0.03784133652226657+0.02749326954205143j)
-    k: 7853981.633974482
-    kzn: 7677134.517542563
-    khron: 1657296.9276400027
-    thetan: 0.21261179128684773
+beam 13 (-3): bessel-beam
+    _amplitude: (0.10091023049872815+0j)
+    _phase: 0
+    _longitudinal_wavenumber: 7442432.9963542195
+    _transversal_wavenumber: 2509027.42144968
+    _axicon_angle: 0.32515882576595073
+    _axicon_angle_degree: 18.630228387818665
+    _bessel_order: 0
 
-beam 14 (n: -7)
-    An: (0.0205108210901638+0.03678836308107564j)
-    k: 7853981.633974482
-    kzn: 7683417.702849743
-    khron: 1627918.8893626295
-    thetan: 0.2087866680705352
+beam 14 (-2): bessel-beam
+    _amplitude: (0.15136534572194543+0j)
+    _phase: 0
+    _longitudinal_wavenumber: 7448716.181661399
+    _transversal_wavenumber: 2490312.1796
+    _axicon_angle: 0.32264522096996784
+    _axicon_angle_degree: 18.486209441645002
+    _bessel_order: 0
 
-beam 15 (n: -6)
-    An: (0.031182975981352445-0.06318361072645683j)
-    k: 7853981.633974482
-    kzn: 7689700.8881569225
-    khron: 1597976.1442171524
-    thetan: 0.2048912050772547
+beam 15 (-1): bessel-beam
+    _amplitude: (0.18709785675374138+0j)
+    _phase: 0
+    _longitudinal_wavenumber: 7454999.366968579
+    _transversal_wavenumber: 2471439.2457243553
+    _axicon_angle: 0.32011257416441
+    _axicon_angle_degree: 18.34109946868925
+    _bessel_order: 0
 
-beam 16 (n: -5)
-    An: (0.03183098784968937+0.0954929834860575j)
-    k: 7853981.633974482
-    kzn: 7695984.073464103
-    khron: 1567436.329742092
-    thetan: 0.20092131040670713
+beam 16 (0): bessel-beam
+    _amplitude: (0.19999999999999998+0j)
+    _phase: 0
+    _longitudinal_wavenumber: 7461282.552275758
+    _transversal_wavenumber: 2452404.97918142
+    _axicon_angle: 0.3175604292915215
+    _axicon_angle_degree: 18.194872338766785
+    _bessel_order: 0
 
-beam 17 (n: -4)
-    An: (-0.046774531582855924+0.14395699834904127j)
-    k: 7853981.633974482
-    kzn: 7702267.258771282
-    khron: 1536263.838430237
-    thetan: 0.1968724806980626
+beam 17 (1): bessel-beam
+    _amplitude: (0.18709785675374138+0j)
+    _phase: 0
+    _longitudinal_wavenumber: 7467565.737582938
+    _transversal_wavenumber: 2433205.5937971757
+    _axicon_angle: 0.3149883119484356
+    _axicon_angle_degree: 18.04750087059556
+    _bessel_order: 0
 
-beam 18 (n: -3)
-    An: (-0.15396187819867996+0.08583939571800085j)
-    k: 7853981.633974482
-    kzn: 7708550.444078461
-    khron: 1504419.3424395456
-    thetan: 0.19273974079021455
+beam 18 (2): bessel-beam
+    _amplitude: (0.15136534572194543+0j)
+    _phase: 0
+    _longitudinal_wavenumber: 7473848.922890117
+    _transversal_wavenumber: 2413837.149565544
+    _axicon_angle: 0.3123957283379777
+    _axicon_angle_degree: 17.898956771681533
+    _bessel_order: 0
 
-beam 19 (n: -2)
-    An: (-0.151365345721931-0.3674914860793171j)
-    k: 7853981.633974482
-    kzn: 7714833.629385641
-    khron: 1471859.2248271774
-    thetan: 0.1885175715065769
+beam 19 (3): bessel-beam
+    _amplitude: (0.10091023049872815+0j)
+    _phase: 0
+    _longitudinal_wavenumber: 7480132.108197297
+    _transversal_wavenumber: 2394295.543729791
+    _axicon_angle: 0.30978216414105547
+    _axicon_angle_degree: 17.74921057371139
+    _bessel_order: 0
 
-beam 20 (n: -1)
-    An: (-0.02794291366126186-0.09836318750982923j)
-    k: 7853981.633974482
-    kzn: 7721116.81469282
-    khron: 1438534.8937986433
-    thetan: 0.18419982257660422
+beam 20 (4): bessel-beam
+    _amplitude: (0.04677446000184015+0j)
+    _phase: 0
+    _longitudinal_wavenumber: 7486415.293504477
+    _transversal_wavenumber: 2374576.501187266
+    _axicon_angle: 0.30714708330335966
+    _axicon_angle_degree: 17.598231563035625
+    _bessel_order: 0
 
-beam 21 (n: 0)
-    An: (0.5499999999999998+0j)
-    k: 7853981.633974482
-    kzn: 7727400.000000001
-    khron: 1404391.9491397254
-    thetan: 0.1797796067750268
+beam 21 (5): bessel-beam
+    _amplitude: (1.7684639574791238e-08+0j)
+    _phase: 0
+    _longitudinal_wavenumber: 7492698.478811656
+    _transversal_wavenumber: 2354675.5641535777
+    _axicon_angle: 0.30448992672827807
+    _axicon_angle_degree: 17.445987705778013
+    _bessel_order: 0
 
-beam 22 (n: 1)
-    An: (-0.02794291366126186+0.09836318750982923j)
-    k: 7853981.633974482
-    kzn: 7733683.18530718
-    khron: 1369369.159907392
-    thetan: 0.17524917007671692
+beam 22 (6): bessel-beam
+    _amplitude: (-0.031182975981352112+0j)
+    _phase: 0
+    _longitudinal_wavenumber: 7498981.664118836
+    _transversal_wavenumber: 2334588.081015145
+    _axicon_angle: 0.301810110867008
+    _axicon_angle_degree: 17.292445567055022
+    _bessel_order: 0
 
-beam 23 (n: 2)
-    An: (-0.151365345721931+0.3674914860793171j)
-    k: 7853981.633974482
-    kzn: 7739966.370614359
-    khron: 1333397.1983498607
-    thetan: 0.1705997308314814
+beam 23 (7): bessel-beam
+    _amplitude: (-0.043247241557549304+0j)
+    _phase: 0
+    _longitudinal_wavenumber: 7505264.849426015
+    _transversal_wavenumber: 2314309.194290764
+    _axicon_angle: 0.299107026195814
+    _axicon_angle_degree: 17.137570223729096
+    _bessel_order: 0
 
-beam 24 (n: 3)
-    An: (-0.15396187819867996-0.08583939571800085j)
-    k: 7853981.633974482
-    kzn: 7746249.555921539
-    khron: 1296397.0549927382
-    thetan: 0.1658212784156398
+beam 24 (8): bessel-beam
+    _amplitude: (-0.03784133652226648+0j)
+    _phase: 0
+    _longitudinal_wavenumber: 7511548.034733195
+    _transversal_wavenumber: 2293833.827613577
+    _axicon_angle: 0.29638003556918535
+    _axicon_angle_degree: 16.98132517005154
+    _bessel_order: 0
 
-beam 25 (n: 4)
-    An: (-0.046774531582855924-0.14395699834904127j)
-    k: 7853981.633974482
-    kzn: 7752532.741228718
-    khron: 1258278.0308760107
-    thetan: 0.16090231813544983
+beam 25 (9): bessel-beam
+    _amplitude: (-0.02078862918465582+0j)
+    _phase: 0
+    _longitudinal_wavenumber: 7517831.220040374
+    _transversal_wavenumber: 2273156.671634125
+    _axicon_angle: 0.29362847243631013
+    _axicon_angle_degree: 16.823672215473994
+    _bessel_order: 0
 
-beam 26 (n: 5)
-    An: (0.03183098784968937-0.0954929834860575j)
-    k: 7853981.633974482
-    kzn: 7758815.926535898
-    khron: 1218935.160269559
-    thetan: 0.15582954373246863
+beam 26 (10): bessel-beam
+    _amplitude: (-9.78519510389083e-11+0j)
+    _phase: 0
+    _longitudinal_wavenumber: 7524114.405347554
+    _transversal_wavenumber: 2252272.1687331437
+    _axicon_angle: 0.2908516389067387
+    _axicon_angle_degree: 16.66457137381914
+    _bessel_order: 0
 
-beam 27 (n: 6)
-    An: (0.031182975981352445+0.06318361072645683j)
-    k: 7853981.633974482
-    kzn: 7765099.1118430775
-    khron: 1178245.8529790496
-    thetan: 0.15058741067370116
+beam 27 (11): bessel-beam
+    _amplitude: (0.017008895577595315+0j)
+    _phase: 0
+    _longitudinal_wavenumber: 7530397.590654734
+    _transversal_wavenumber: 2231174.496418839
+    _axicon_angle: 0.2880488036493534
+    _axicon_angle_degree: 16.503980742900495
+    _bessel_order: 0
 
-beam 28 (n: 7)
-    An: (0.0205108210901638-0.03678836308107564j)
-    k: 7853981.633974482
-    kzn: 7771382.297150257
-    khron: 1136065.4463313594
-    thetan: 0.1451575708144762
+beam 28 (12): bessel-beam
+    _amplitude: (0.02522755737950834+0j)
+    _phase: 0
+    _longitudinal_wavenumber: 7536680.775961913
+    _transversal_wavenumber: 2209857.549267511
+    _axicon_angle: 0.2852191996067502
+    _axicon_angle_degree: 16.341856373566177
+    _bessel_order: 0
 
-beam 29 (n: 8)
-    An: (0.03784133652226657-0.02749326954205143j)
-    k: 7853981.633974482
-    kzn: 7777665.482457437
-    khron: 1092221.2000316645
-    thetan: 0.13951810906467205
+beam 29 (13): bessel-beam
+    _amplitude: (0.023286976492419245+0j)
+    _phase: 0
+    _longitudinal_wavenumber: 7542963.961269093
+    _transversal_wavenumber: 2188314.919248177
+    _axicon_angle: 0.2823620215048107
+    _axicon_angle_degree: 16.178152127007845
+    _bessel_order: 0
 
-beam 30 (n: 9)
-    An: (0.03847253210539123+0.010929240151955373j)
-    k: 7853981.633974482
-    kzn: 7783948.667764617
-    khron: 1046504.0107013109
-    thetan: 0.13364249007491988
+beam 30 (14): bessel-beam
+    _amplitude: (0.013364130330217263+0j)
+    _phase: 0
+    _longitudinal_wavenumber: 7549247.146576272
+    _transversal_wavenumber: 2166539.8742507566
+    _axicon_angle: 0.27947642313458737
+    _axicon_angle_degree: 16.01281951902422
+    _bessel_order: 0
 
-beam 31 (n: 10)
-    An: (3.0740954469535705e-09+0.09549296507929145j)
-    k: 7853981.633974482
-    kzn: 7790231.853071796
-    khron: 998656.6888546105
-    thetan: 0.1274980677411427
-
-beam 32 (n: 11)
-    An: (-0.0314775267677681+0.00894210663805917j)
-    k: 7853981.633974482
-    kzn: 7796515.038378975
-    khron: 948356.8754108134
-    thetan: 0.12104391291511342
-
-beam 33 (n: 12)
-    An: (-0.02522755737950849-0.018328787570894366j)
-    k: 7853981.633974482
-    kzn: 7802798.223686155
-    khron: 895191.2573571438
-    thetan: 0.1142275343595416
-
-beam 34 (n: 13)
-    An: (-0.011044288562273383-0.019809199563136568j)
-    k: 7853981.633974482
-    kzn: 7809081.4089933345
-    khron: 838614.9620196125
-    thetan: 0.10697971423775085
-
-beam 35 (n: 14)
-    An: (-0.013364130330217194+0.02707869119356903j)
-    k: 7853981.633974482
-    kzn: 7815364.594300515
-    khron: 777884.159089538
-    thetan: 0.09920593498459301
-
-beam 36 (n: 15)
-    An: (-0.01060997352963348-0.03183098595633035j)
-    k: 7853981.633974482
-    kzn: 7821647.779607694
-    khron: 711936.4568320095
-    thetan: 0.09077116372641432
-
-beam 37 (n: 16)
-    An: (0.01169361425778463-0.03598925115495241j)
-    k: 7853981.633974482
-    kzn: 7827930.964914873
-    khron: 639159.0688829933
-    thetan: 0.08147035576191086
-
-beam 38 (n: 17)
-    An: (0.02716974270455085-0.015148143788917916j)
-    k: 7853981.633974482
-    kzn: 7834214.150222053
-    khron: 556880.7370245797
-    thetan: 0.0709638032588877
-
-beam 39 (n: 18)
-    An: (0.01681837253390025+0.04083239534770123j)
-    k: 7853981.633974482
-    kzn: 7840497.335529232
-    khron: 460031.56236011063
-    thetan: 0.05860658158547614
-
-beam 40 (n: 19)
-    An: (0.0014706753548539252+0.005177007534248524j)
-    k: 7853981.633974482
-    kzn: 7846780.520836412
-    khron: 336248.3674766713
-    thetan: 0.04282556118334132
-
-beam 41 (n: 20)
-    An: (1.2285734250913214e-08-6.467031533694154e-09j)
-    k: 7853981.633974482
-    kzn: 7853063.706143592
-    khron: 120074.70199320844
-    thetan: 0.015288981523813699
+beam 31 (15): bessel-beam
+    _amplitude: (6.914223448785904e-09+0j)
+    _phase: 0
+    _longitudinal_wavenumber: 7555530.331883452
+    _transversal_wavenumber: 2144525.334613142
+    _axicon_angle: 0.2765615143805271
+    _axicon_angle_degree: 15.845807549750827
+    _bessel_order: 0

@@ -29,39 +29,41 @@ class gaussian(PlaneWave):
         self.name = 'gaussian-beam'
 
         self.params = {
-            '_beta': pi/4,
-            '_nm': 1,
+            '_medium_refractive_index': 1,
             '_wavelength': 488e-9/1.33,
             '_omega0': 0.2e-6,
             '_P': 1e-3
         }
 
-        self._nm = 1
-        self.nm = 1
+        self._medium_refractive_index = 1
+        self.medium_refractive_index = 1
         self._wavelength = 488e-9/1.33
         self.wavelength = 488e-9/1.33
         self._omega0 = 0.2e-6
         self.omega0 = 0.2e-6
         self._P = 1e-3
         self.P = 1e-3
-        self._k = 2*ma.pi*self._nm/self._wavelength
-        self.k = self._k
+        self._wavenumber = 2*ma.pi*self._medium_refractive_index/self._wavelength
+        self.wavenumber = self._wavenumber
 
 
     def psi(self, pt):
 
         wl = self._wavelength
         omega0 = self._omega0
-        k = self._k
+        k = self._wavenumber
         P = self._P
-        nm = self._nm
+        nm = self._medium_refractive_index
 
         E0 = ma.sqrt(2*P/(pi*omega0**2*nm*c))
         E0 = 1
 
         omega = omega0*ma.sqrt((1+((wl*pt.z)/(pi*omega0**2))**2))
 
-        r = pt.z*(1 + ( (pi*omega0**2)/(wl*pt.z) )**2 )
+        if pt.z != 0:
+            r = pt.z*(1 + ( (pi*omega0**2)/(wl*pt.z) )**2 )
+        else:
+            r = 0
 
         delta_phi = ma.atan(wl*pt.z/(pi*omega0**2))
 
@@ -86,22 +88,22 @@ Rp=6e-6
 
 ptc = []
 
-particle = SphericalParticle(nm=1.33)
-particle.Rp = Rp
-particle.np = 1.6
-particle.alphap = 0.001e6
+particle = SphericalParticle(medium_refractive_index=1.33)
+particle.radius = Rp
+particle.refractive_index = 1.6
+particle.absorption_coefficient = 0.001e6
 ptc.append(particle)
 
-particle = SphericalParticle(nm=1.33)
-particle.Rp = Rp
-particle.np = 1.6
-particle.alphap = 0.02e6
+particle = SphericalParticle(medium_refractive_index=1.33)
+particle.radius = Rp
+particle.refractive_index = 1.6
+particle.absorption_coefficient = 0.02e6
 ptc.append(particle)
 
-particle = SphericalParticle(nm=1.33)
-particle.Rp = Rp
-particle.np = 1.6
-particle.alphap = 0.5e6
+particle = SphericalParticle(medium_refractive_index=1.33)
+particle.radius = Rp
+particle.refractive_index = 1.6
+particle.absorption_coefficient = 0.5e6
 ptc.append(particle)
 
 z=[]
@@ -113,7 +115,7 @@ z.append(+2*Rp)
 #print(gb.psi(Point(-1.54740140e-05, -1.139921e-06, -6.78348481e-07)))
 #exit()
 # ===========================
-numberPoints = 2**4 + 1
+numberPoints = 2**5 + 1
 x_initial = -3*Rp
 x_final = 3*Rp
 
@@ -140,11 +142,10 @@ for i in range(len(z)):
 
     for j in range(len(ptc)):
         print('i: ', i+1, 'j: ', j+1)
-        # calculate first initial forces
-        x = [x_initial, 0, x_final]
-        fx = [Force._geo_opt(gb, ptc[j], Point(x,0,z[i]))[0] for x in x]
+        x = np.linspace(x_initial, x_final, numberPoints)
+        fx = [Force.geo_opt(gb, ptc[j], Point([x,0,z[i]]), 'fx') for x in x]
 
-        # get forces on x range if them have alread been calculated
+        '''# get forces on x range if them have alread been calculated
         def match(table, key_colnames):
             all_params = {}
 
@@ -192,7 +193,7 @@ for i in range(len(z)):
         t = t.group_by('x')
 
         x = list(t['x'])
-        fx = [Force._geo_opt(gb, ptc[j], Point(x, 0, z[i]))[0] for x in x]
+        fx = [Force.geo_opt(gb, ptc[j], Point([x, 0, z[i]]))[0] for x in x]
 
         # add points in x to lenght x reaches numberPoints
         while len(x) < numberPoints:
@@ -205,7 +206,7 @@ for i in range(len(z)):
                     i_max_delta = k
             # insert a number in x at max interval distance
             x.insert(i_max_delta+1, (x[i_max_delta]+x[i_max_delta+1])/2)
-            fx = [Force._geo_opt(gb, ptc[j], Point(x, 0, z[i]))[0] for x in x]
+            fx = [Force.geo_opt(gb, ptc[j], Point([x, 0, z[i]]))[0] for x in x]'''
 
         plt.plot([x/Rp for x in x], fx, style(j), label=lbl(j))
 
@@ -256,7 +257,7 @@ plt.show()'''
 '''z = np.linspace(0.05, 1.25*Zmax, 51)
 rho = np.linspace(-Rmax*1e3, Rmax*1e3, 21)
 
-INTY = [[ibb.intensity(Point(rho*1e-3, 0, z, 'cilin')) for rho in rho] 
+INTY = [[ibb.intensity(Point(rho*1e-3, 0, z, 'cilin')) for rho in rho]
     for z in z]
 RHO, Z = np.meshgrid(rho, z)
 

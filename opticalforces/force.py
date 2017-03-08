@@ -35,11 +35,11 @@ def timing(func):
     return wrapped
 
 def save_database(regime):
-    def force(func):
+    def _force(func):
         @wraps(func)
-        def wrapped(self, beam, ptc, ptc_pos, *args, **kwargs):
+        def wrapped(self, beam, ptc, ptc_pos, force, *args, **kwargs):
             # Database's name
-            database_name = beam.name + '-' + regime + '.fits'
+            database_name = beam.name + '-' + force + '-' + regime + '.fits'
             all_params = {}
 
             # Beam's parameters
@@ -65,9 +65,7 @@ def save_database(regime):
             all_params_WF = all_params
 
             # Force's parameters
-            all_params.update({'fx': None,
-                               'fy': None,
-                               'fz': None})
+            all_params.update({'force': None})
 
             # Verify if exist a database and if currently params
             # have already been calculated for this beam. if there,
@@ -78,9 +76,7 @@ def save_database(regime):
                 # Match function used to filter database.
                 def match(table, key_colnames):
                     for key in key_colnames:
-                        if (key == 'fx'
-                                or key == 'fy'
-                                or key == 'fz'):
+                        if key == 'force':
                             continue
 
                         if table[key][0] != all_params_WF[key]:
@@ -93,9 +89,7 @@ def save_database(regime):
 
                     # sort by column's names except forces
                     key_names = db.colnames
-                    key_names.remove('fx')
-                    key_names.remove('fy')
-                    key_names.remove('fz')
+                    key_names.remove('force')
                     db = db.group_by([key for key in key_names])
 
                     # Verify if currently forces have already been
@@ -106,11 +100,7 @@ def save_database(regime):
                     # means that at least one point have already
                     # been calculated.
                     if len(db_match) > 0:
-                        fx = db_match['fx'][0]
-                        fy = db_match['fy'][0]
-                        fz = db_match['fz'][0]
-
-                        return [fx, fy, fz]
+                        return db_match['force'][0]
 
             except:
                 # database create
@@ -119,11 +109,9 @@ def save_database(regime):
                 db.write(database_name)
 
             # Force (:obj:'Point')
-            F = func(self, beam, ptc, ptc_pos, *args, **kwargs)
+            __force = func(self, beam, ptc, ptc_pos, force, *args, **kwargs)
 
-            all_params['fx'] = F[0]
-            all_params['fy'] = F[1]
-            all_params['fz'] = F[2]
+            all_params['force'] = __force
 
             data_rows = [all_params[key] for key in db.colnames]
 
@@ -133,11 +121,11 @@ def save_database(regime):
             # Save new database
             db.write(database_name, overwrite=True)
 
-            return F
+            return __force
 
         return wrapped
 
-    return force
+    return _force
 
 
 class SphericalParticle(object):
@@ -403,7 +391,7 @@ class SphericalParticle(object):
                   / den)
 
             Qd = (-R*ma.sin(2*thetai)
-                   - (1-R)**2 * ma.exp(-self.absorption_coefficient*l)
+                   - (1-R)**2*ma.exp(-self.absorption_coefficient*l)
                    * (ma.sin(2*(thetar-thetai))
                       - R*ma.exp(-self.absorption_coefficient*l)
                       * ma.sin(2*thetai))
@@ -446,7 +434,7 @@ class Force(object):
     @classmethod
     @timing
     @save_database('geo-opt')
-    def geo_opt(cls, beam, ptc, ptc_pos):
+    def geo_opt(cls, beam, ptc, ptc_pos, force, simps_points=101):
         """ Force that beam causes in a spherical particle in a deter-
         mined position in geometrical optics regime (particle radius is
         greater than 10 times beam's wavelenght).
@@ -504,10 +492,15 @@ class Force(object):
 
             # Check if is a valid condition
             if ptc.incident_angle(theta, phi) >= pi/2:
-                return {'fx': 0, 'fy': 0, 'fz': 0, 'dA': 0}
+                return {'force': 0, 'eff_area': 0}
 
             # Force of a single ray.
-            force = ptc.force_ray(theta, phi)
+            if force == 'fx':
+                _force = ptc.force_ray(theta, phi)[0]
+            elif force == 'fy':
+                _force = ptc.force_ray(theta, phi)[1]
+            elif force == 'fz':
+                _force = ptc.force_ray(theta, phi)[2]
 
             '''msg = ''
             msg += 'np=' + str(ptc.refractive_index) + ';\n'
@@ -534,44 +527,33 @@ class Force(object):
             print(msg)
             time.sleep(1)'''
 
-            return {'fx': force[0]*ma.sin(theta),
-                    'fy': force[1]*ma.sin(theta),
-                    'fz': force[2]*ma.sin(theta),
-                    'dA': ma.sin(theta)}
+            return {'force': _force*ma.sin(theta), 'eff_area': ma.sin(theta)}
 
         def integration():
-            nptheta = 301
+            nptheta = simps_points
 
-            theta_list = np.linspace(0, pi, nptheta)
+            theta_list = np.linspace(0, pi, 1000)
 
-            fx_theta_integral = []
-            fy_theta_integral = []
-            fz_theta_integral = []
-            dA_theta_integral = []
+            dforce_theta = []
+            deff_area_theta = []
+
             for theta in theta_list:
-                phi_list = np.linspace(0, 2*pi,
-                                       ma.floor(nptheta*ma.sin(theta)+1))
-                fx_phi_integral = []
-                fy_phi_integral = []
-                fz_phi_integral = []
-                dA_phi_integral = []
+                phi_list = np.linspace(0, 2*pi, 20)
+                                       #ma.floor(nptheta*ma.sin(theta)+1))
+
+                dforce_phi = []
+                deff_area_phi = []
                 for phi in phi_list:
                     values = integrand(theta, phi)
-                    fx_phi_integral.append(values['fx'])
-                    fy_phi_integral.append(values['fy'])
-                    fz_phi_integral.append(values['fz'])
-                    dA_phi_integral.append(values['dA'])
-                fx_theta_integral.append(simps(fx_phi_integral, phi_list))
-                fy_theta_integral.append(simps(fy_phi_integral, phi_list))
-                fz_theta_integral.append(simps(fz_phi_integral, phi_list))
-                dA_theta_integral.append(simps(dA_phi_integral, phi_list))
+                    dforce_phi.append(values['force'])
+                    deff_area_phi.append(values['eff_area'])
 
-            eff_area = simps(dA_theta_integral, theta_list)
-            fx = simps(fx_theta_integral, theta_list)/eff_area
-            fy = simps(fy_theta_integral, theta_list)/eff_area
-            fz = simps(fz_theta_integral, theta_list)/eff_area
+                dforce_theta.append(simps(dforce_phi, phi_list))
+                deff_area_theta.append(simps(deff_area_phi, phi_list))
 
-            return [fx, fy, fz]
+            eff_area = simps(deff_area_theta, theta_list)
+
+            return simps(dforce_theta, theta_list)/eff_area
 
         return integration()
 
