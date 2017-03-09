@@ -2,13 +2,13 @@ import math as ma
 from math import pi
 import cmath as cm
 from numbers import Number
+from functools import wraps
+import time
 from scipy.integrate import simps
 from astropy.table import Table
-import numpy as np
-import time
+import numpy
 
 from beam import Point
-from plots import *
 
 import pyperclip
 
@@ -28,10 +28,10 @@ def round_sig(num, sig=4):
 def timing(func):
     @wraps(func)
     def wrapped(*args, **kwargs):
-        t0 = time.time()
-        F = func(*args, **kwargs)
-        print('time:', time.time() - t0)
-        return F
+        time0 = time.time()
+        _func = func(*args, **kwargs)
+        print('time:', time.time() - time0)
+        return _func
     return wrapped
 
 def save_database(regime):
@@ -140,12 +140,6 @@ class SphericalParticle(object):
         self._medium_refractive_index = None
         self._absorption_coefficient = 0
 
-        # auxiliary
-        self._incident_ray = None
-        self._incident_ray_abs = None
-        self._incident_ray_direction = None
-        self._electric_field_direction = None
-
         for key, value in kwargs.items():
             if hasattr(self, '_' + key):
                 setattr(self, key, value)
@@ -189,46 +183,7 @@ class SphericalParticle(object):
     def absorption_coefficient(self, value):
         self._absorption_coefficient = value
 
-    @property
-    def incident_ray(self):
-        return self._incident_ray
-
-    @incident_ray.setter
-    def incident_ray(self, vector):
-        self._incident_ray = vector
-        self._incident_ray_abs = np.linalg.norm(vector)
-        self._incident_ray_power = np.linalg.norm(vector)
-        if self._incident_ray_abs >= 1e-99:
-            self._incident_ray_direction = [v/np.linalg.norm(vector)
-                                            for v in vector]
-        else:
-            self._incident_ray_direction = [0, 0, 0]
-            self._incident_ray_abs = 0
-            self._incident_ray_power = 0
-
-    @property
-    def incident_ray_abs(self):
-        return self._incident_ray_abs
-
-    @property
-    def incident_ray_power(self):
-        return self._incident_ray_power
-
-    @property
-    def incident_ray_direction(self):
-        return self._incident_ray_direction
-
-    @property
-    def electric_field_direction(self):
-        return self._electric_field_direction
-
-    @electric_field_direction.setter
-    def electric_field_direction(self, vector):
-        if np.linalg.norm(vector) != 0:
-            self._electric_field_direction = [v/np.linalg.norm(vector)
-                                              for v in vector]
-        else:
-            self._electric_field_direction = [0, 0, 0]
+    # --- Methods ----
 
     @staticmethod
     def normal(theta, phi):
@@ -238,92 +193,115 @@ class SphericalParticle(object):
         elif theta == pi:
             return [0, 0, -1]
         else:
-            return [ma.sin(theta)*ma.cos(phi),
-                    ma.sin(theta)*ma.sin(phi),
+            return [ma.sin(theta)*ma.cos(phi), ma.sin(theta)*ma.sin(phi),
                     ma.cos(theta)]
 
-    def incident_angle(self, theta, phi):
-        normal = self.normal(theta, phi)
-        return ma.acos(-np.dot(self.incident_ray_direction, normal))
-
-    def ortonormal_incident_ray(self, theta, phi):
-        k0 = self.incident_ray_direction
-        normal = self.normal(theta, phi)
-        dot = np.dot(k0, normal)
+    @staticmethod
+    def ortonormal_ray_direction(ray_direction, normal):
+        dot = numpy.dot(ray_direction, normal)
         if dot == 0:
             return [0, 0, 0]
 
-        d0 = [n-k for n, k in zip(normal, [dot*k for k in k0])]
+        d0 = [n-k for n, k in zip(normal, [dot*k for k in ray_direction])]
 
-        if np.linalg.norm(d0) == 0:
+        if numpy.linalg.norm(d0) == 0:
             return [0, 0, 0]
 
-        return [d/np.linalg.norm(d0) for d in d0]
+        return [d/numpy.linalg.norm(d0) for d in d0]
 
-    def crossing_angle(self, theta, phi):
+    @staticmethod
+    def incident_angle(ray_direction, normal):
+        return ma.acos(-numpy.dot(ray_direction, normal))
+
+    @staticmethod
+    def refracted_angle(incident_angle, medium_refractive_index,
+                        particle_refractive_index):
+        return cm.asin(medium_refractive_index*ma.sin(incident_angle)
+                       /particle_refractive_index).real
+
+    @staticmethod
+    def crossing_angle(ray_direction, normal, electric_field):
         """ Crossing angle between the polarization direction of the
         incident beam and the normal vector of the incident plane."""
 
-        k0 = self.incident_ray_direction
-        ef0 = self.electric_field_direction
-        n0 = self.normal(theta, phi)
-        plane_normal = np.cross(k0, n0)
-
-        if np.linalg.norm(plane_normal) == 0:
+        plane_normal = numpy.cross(ray_direction, normal)
+        if numpy.linalg.norm(plane_normal) == 0:
             return 0
+        plane_normal /= numpy.linalg.norm(plane_normal)
 
-        plane_normal /= np.linalg.norm(plane_normal)
-        return ma.acos(abs(np.dot(ef0, plane_normal)))
+        _electric_field = electric_field/numpy.linalg.norm(electric_field)
 
-    def refracted_angle(self, theta, phi):
-        incident_angle = self.incident_angle(theta, phi)
-        return cm.asin(self.medium_refractive_index
-                       *ma.sin(incident_angle)
-                       /self.refractive_index).real
+        return ma.acos(abs(numpy.dot(_electric_field, plane_normal)))
 
-    def reflectance(self, theta, phi):
-        thetai = self.incident_angle(theta, phi)
-        thetar = self.refracted_angle(theta, phi)
-        beta = self.crossing_angle(theta, phi)
+    @staticmethod
+    def parallel_reflection(incident_angle, refracted_angle):
+        if incident_angle == refracted_angle:
+            return 0
+        return (ma.tan(incident_angle - refracted_angle)
+                / ma.tan(incident_angle + refracted_angle))
+
+    @staticmethod
+    def parallel_trasmission(incident_angle, refracted_angle):
+        if incident_angle == refracted_angle:
+            return 1
+        return (2*ma.sin(refracted_angle)*ma.cos(incident_angle)
+                /(ma.sin(incident_angle+refracted_angle)
+                  *ma.cos(incident_angle-refracted_angle)))
+
+    @staticmethod
+    def perpendicular_reflection(incident_angle, refracted_angle):
+        if incident_angle == refracted_angle:
+            return 0
+        return -(ma.sin(incident_angle - refracted_angle)
+                 / ma.sin(incident_angle + refracted_angle))
+
+    @staticmethod
+    def perpendicular_trasmission(incident_angle, refracted_angle):
+        if incident_angle == refracted_angle:
+            return 1
+        return (2*ma.sin(refracted_angle)*ma.cos(incident_angle)
+                /(ma.sin(incident_angle+refracted_angle)))
+
+    @classmethod
+    def reflectance(cls, incident_angle, refracted_angle, crossing_angle):
 
         # Rs and Rp: Fresnell transmission and reflection coeffici-
         # ents for s (perpendicular) and p (paralell) polarization.
-        if thetai + thetar != 0:
-            Rs = (ma.tan(thetai-thetar)/ma.tan(thetai+thetar))**2
-            # Rs must not be greater than 1
-            if Rs > 1:
-                Rs = 1
-
-            Rp = (ma.sin(thetai-thetar)/ma.sin(thetai+thetar))**2
-            # Rp must not be greater than 1
-            if Rp > 1:
-                Rp = 1
-        else:
+        Rs = (cls.perpendicular_reflection(incident_angle, refracted_angle))**2
+        # Rs must not be greater than 1
+        if Rs > 1:
             Rs = 1
+
+        Rp = (cls.parallel_reflection(incident_angle, refracted_angle))**2
+        # Rp must not be greater than 1
+        if Rp > 1:
             Rp = 1
 
         # Reflection coefficient.
-        return Rs*ma.sin(beta)**2 + Rp*ma.cos(beta)**2
+        return Rs*ma.sin(crossing_angle)**2 + Rp*ma.cos(crossing_angle)**2
 
-    def transmittance(self, theta, phi):
-        return 1 - self.reflectance(theta, phi)
+    @classmethod
+    def transmittance(cls, incident_angle, refracted_angle, crossing_angle):
+        return (1 - cls.reflectance(incident_angle, refracted_angle,
+                                    crossing_angle))
 
-    def reflected_ray(self, theta, phi):
-        if self.incident_ray_abs == 0:
+    @classmethod
+    def reflected_ray(cls, incident_ray, normal, reflectance):
+        if incident_ray == [0, 0, 0]:
             return [0, 0, 0]
 
-        k0 = self.incident_ray
-        thetai = self.incident_angle(theta, phi)
-        d0 = self.ortonormal_incident_ray(theta, phi)
+        incident_ray_abs = numpy.linalg.norm(incident_ray)
+        k0 = incident_ray/incident_ray_abs
+        d0 = cls.ortonormal_ray_direction(k0, normal)
+        incident_angle = cls.incident_angle(k0, n0)
 
-        rotation = cm.exp(1j*(pi-2*thetai))
-        a_k0, a_d0 = rotation.real, rotation.imag
-        ref_ray = [a_k0*k + a_d0*d for k, d in zip(k0, d0)]
-        abs_ref_ray = self.incident_ray_abs*self.reflectance(theta, phi)
+        rotat = cm.exp(1j*(pi-2*incident_angle))
+        ref_ray = [rotat.real*k + rotat.imag*d for k, d in zip(k0, d0)]
+        ref_ray_abs = incident_ray_abs*reflectance
 
-        return [abs_ref_ray*component for component in ref_ray]
+        return [ref_ray_abs*value for value in ref_ray]
 
-    def internal_ray(self, theta, phi, n=0):
+    '''def internal_ray(self, theta, phi, n=0):
         if self.incident_ray_abs == 0:
             return [0, 0, 0]
 
@@ -342,89 +320,102 @@ class SphericalParticle(object):
         abs_int_ray = (self.incident_ray_abs
                        *ma.exp(-self.absorption_coefficient*l)*(1-R)*R**n)
 
-        return [abs_int_ray*component for component in int_ray]
+        return [abs_int_ray*component for component in int_ray]'''
 
-    def refracted_ray(self, theta, phi, n=0):
-        if self.incident_ray_abs == 0:
+    def outgoing_ray(self, theta, phi, incident_ray, electric_field, ray=0):
+        if incident_ray == [0, 0, 0]:
             return [0, 0, 0]
 
-        k0 = self.incident_ray
-        thetai = self.incident_angle(theta, phi)
-        thetar = self.refracted_angle(theta, phi)
-        d0 = self.ortonormal_incident_ray(theta, phi)
-        R = self.reflectance(theta, phi)
-        # Distance travelled by a single ray before and after hit
-        # sphere's surface.
-        l = 2*self.radius*ma.cos(thetar)
+        incident_ray_abs = numpy.linalg.norm(incident_ray)
+        n0 = self.normal(theta, phi)
+        k0 = incident_ray/incident_ray_abs
+        d0 = self.ortonormal_ray_direction(k0, n0)
+        incident_angle = self.incident_angle(k0, n0)
+        refracted_angle = self.refracted_angle(incident_angle,
+                                               self.medium_refractive_index,
+                                               self.refractive_index)
+        _electric_field = electric_field/numpy.linalg.norm(electric_field)
+        crossing_angle = self.crossing_angle(k0, n0, _electric_field)
+        reflectance = self.reflectance(incident_angle, refracted_angle,
+                                       crossing_angle)
+        length = 2*self.radius*ma.cos(refracted_angle)
 
-        rotation = cm.exp(-1j*(n*(pi-2*thetar)+2*(thetai-thetar)))
-        a_k0, a_d0 = rotation.real, rotation.imag
-        refrac_ray = [a_k0*k + a_d0*d for k, d in zip(k0, d0)]
-        abs_refrac_ray = (self.incident_ray_abs
-                          *ma.exp(-self.absorption_coefficient*l)
-                          *(1-R)**2*R**n)
+        rotat = cm.exp(-2j*(incident_angle-refracted_angle))
+        rotat *= cm.exp(-1j*ray*(pi-2*refracted_angle))
 
-        return [abs_refrac_ray*component for component in refrac_ray]
+        out_ray = [rotat.real*k + rotat.imag*d for k, d in zip(k0, d0)]
 
-    def Qkd(self, theta, phi):
-        if self.incident_ray_abs == 0:
-            return 0, 0
+        out_ray_abs = (1-reflectance)**2*ma.exp(-self.absorption_coefficient
+                                                *length)
+        out_ray_abs *= (reflectance*ma.exp(-self.absorption_coefficient
+                                           *length))**ray
 
-        k0 = self.incident_ray
-        thetai = self.incident_angle(theta, phi)
-        thetar = self.refracted_angle(theta, phi)
-        d0 = self.ortonormal_incident_ray(theta, phi)
-        R = self.reflectance(theta, phi)
-        # Distance travelled by a single ray before and after hit
-        # sphere's surface.
-        l = 2*self.radius*ma.cos(thetar)
+        return [out_ray_abs*value for value in out_ray]
 
-        den = (1 + R**2 * ma.exp(-2*self.absorption_coefficient*l)
-               + 2*R*ma.exp(-self.absorption_coefficient*l)*ma.cos(2*thetar))
+    def Qkd(self, incident_angle, refracted_angle, reflectance):
+
+        length = 2*self.radius*ma.cos(refracted_angle)
+        internal_absorption = ma.exp(-self._absorption_coefficient*length)
+
+        den = (1 + 2*reflectance*internal_absorption*ma.cos(2*refracted_angle)
+               + reflectance**2*internal_absorption)
 
         if den != 0:
-            Qk = (1 + R*ma.cos(2*thetai)
-                  - (1-R)**2*ma.exp(-self.absorption_coefficient*l)
-                  * (ma.cos(2*(thetai-thetar))
-                     + R*ma.exp(-self.absorption_coefficient*l)
-                     * ma.cos(2*thetai))
-                  / den)
+            Qk = (1 + reflectance*ma.cos(2*incident_angle)
+                  - (1-reflectance)**2*internal_absorption
+                  * (ma.cos(2*(incident_angle-refracted_angle))
+                     + reflectance*internal_absorption
+                     * ma.cos(2*incident_angle))/den)
 
-            Qd = (-R*ma.sin(2*thetai)
-                   - (1-R)**2*ma.exp(-self.absorption_coefficient*l)
-                   * (ma.sin(2*(thetar-thetai))
-                      - R*ma.exp(-self.absorption_coefficient*l)
-                      * ma.sin(2*thetai))
-                   / den)
-
+            Qd = (-reflectance*ma.sin(2*incident_angle)
+                  - (1-reflectance)**2*internal_absorption
+                  * (ma.sin(2*(refracted_angle-incident_angle))
+                     - reflectance*internal_absorption
+                     * ma.sin(2*incident_angle))/den)
         else:
-            Qk = (1 + R*ma.cos(2*thetai)
-                  - ma.exp(-self.absorption_coefficient*l)
-                  * (ma.cos(2*(thetar-thetai))
-                     + R*ma.exp(-self.absorption_coefficient*l)
-                     * ma.cos(2 * thetai)))
+            Qk = (1 + reflectance*ma.cos(2*incident_angle)
+                  - internal_absorption
+                  * (ma.cos(2*(refracted_angle-incident_angle))
+                     + reflectance*internal_absorption
+                     * ma.cos(2*incident_angle)))
 
-            Qd = (-R*ma.sin(2*thetai)
-                   - ma.exp(-self.absorption_coefficient*l)
-                   * (ma.sin(2*(thetar-thetai))
-                      - R*ma.exp(-self.absorption_coefficient*l)
-                      * ma.sin(2*thetai)))
+            Qd = (-reflectance*ma.sin(2*incident_angle)
+                  - internal_absorption
+                  * (ma.sin(2*(refracted_angle-incident_angle))
+                     - reflectance*internal_absorption
+                     * ma.sin(2*incident_angle)))
 
         return Qk, Qd
 
-    def force_ray(self, theta, phi):
-        if self.incident_ray_abs == 0:
+    def force_ray(self, theta, phi, incident_ray, power_ray, electric_field):
+        if incident_ray == [0, 0, 0]:
             return [0, 0, 0]
 
-        k0 = self.incident_ray_direction
-        thetai = self.incident_angle(theta, phi)
-        d0 = self.ortonormal_incident_ray(theta, phi)
-        Qk, Qd = self.Qkd(theta, phi)
+        incident_ray_abs = numpy.linalg.norm(incident_ray)
+        n0 = self.normal(theta, phi)
+        k0 = incident_ray/incident_ray_abs
+        d0 = self.ortonormal_ray_direction(k0, n0)
+        incident_angle = self.incident_angle(k0, n0)
 
-        f = [Qk*k + Qd*d for k, d in zip(k0, d0)]
+        # Check if is a valid condition
+        if incident_angle >= pi/2:
+            return [0, 0, 0]
 
-        return [self.medium_refractive_index*self.incident_ray_power
-                *component/speed_of_light for component in f]
+        refracted_angle = self.refracted_angle(incident_angle,
+                                               self._medium_refractive_index,
+                                               self._refractive_index)
+        _electric_field = electric_field/numpy.linalg.norm(electric_field)
+        crossing_angle = self.crossing_angle(k0, n0, _electric_field)
+
+        reflectance = self.reflectance(incident_angle, refracted_angle,
+                                       crossing_angle)
+        Qk, Qd = self.Qkd(incident_angle, refracted_angle, reflectance)
+
+        force = [Qk*k + Qd*d for k, d in zip(k0, d0)]
+
+        force_factor = self.medium_refractive_index*power_ray/speed_of_light
+
+        return [force_factor*f for f in force]
 
 
 class Force(object):
@@ -487,20 +478,16 @@ class Force(object):
             # Beam's power at particle surface
             power = beam.intensity(bps)
 
-            # Incident ray: vector k0 plus its power (intensity)
-            ptc.incident_ray = [power*k for k in k0]
-
-            # Check if is a valid condition
-            if ptc.incident_angle(theta, phi) >= pi/2:
-                return {'force': 0, 'eff_area': 0}
+            # Electric field direction
+            E0 = beam._electric_field_direction
 
             # Force of a single ray.
             if force == 'fx':
-                _force = ptc.force_ray(theta, phi)[0]
+                _force = ptc.force_ray(theta, phi, k0, power, E0)[0]
             elif force == 'fy':
-                _force = ptc.force_ray(theta, phi)[1]
+                _force = ptc.force_ray(theta, phi, k0, power, E0)[1]
             elif force == 'fz':
-                _force = ptc.force_ray(theta, phi)[2]
+                _force = ptc.force_ray(theta, phi, k0, power, E0)[2]
 
             '''msg = ''
             msg += 'np=' + str(ptc.refractive_index) + ';\n'
@@ -532,13 +519,13 @@ class Force(object):
         def integration():
             nptheta = simps_points
 
-            theta_list = np.linspace(0, pi, 1000)
+            theta_list = numpy.linspace(0, pi, 1000)
 
             dforce_theta = []
             deff_area_theta = []
 
             for theta in theta_list:
-                phi_list = np.linspace(0, 2*pi, 20)
+                phi_list = numpy.linspace(0, 2*pi, 20)
                                        #ma.floor(nptheta*ma.sin(theta)+1))
 
                 dforce_phi = []
@@ -561,7 +548,7 @@ class Force(object):
 if __name__ == '__main__':
     print("Please, visit: https://github.com/arantespp/opticalforces")
 
-    from beam import FrozenWave
+    '''from beam import FrozenWave
 
     fw = FrozenWave()
 
@@ -577,11 +564,42 @@ if __name__ == '__main__':
     fw.L = 1*1e-3
     fw.R = 17.5e-6
     fw.Q = 0.95*fw.wavenumber
-    fw.reference_function = func
+    fw.referencepy_function = func'''
 
     Rp = 17.5e-6
 
     ptc = SphericalParticle(radius=Rp, medium_refractive_index=1.33,
-                            refractive_index=1.010*1.33)
+                            refractive_index=1.1*1.33)
 
-    print(Force.geo_opt(fw, ptc, Point([0, 0, -0.01])))
+    nm = 1.33
+    np = 1.33*1.1
+    ptc.medium_refractive_index = nm
+    ptc.refractive_index = np
+    theta = 2*pi/3
+    phi = 0
+
+    n0 = ptc.normal(theta, phi)
+    k0 = [-0.6, 0, 0.8]
+    E0 = [1, 0, 0]
+    thetai = ptc.incident_angle(k0, n0)
+    thetar = ptc.refracted_angle(thetai, nm, np)
+    d0 = ptc.ortonormal_ray_direction(k0, n0)
+    beta = ptc.crossing_angle(k0, n0, E0)
+    reflectance = ptc.reflectance(thetai, thetar, beta)
+    ref_ray = ptc.reflected_ray(k0, n0, reflectance)
+    out_ray = ptc.outgoing_ray(theta, phi, k0, E0, ray=2)
+    Qk, Qd = ptc.Qkd(thetai, thetar, reflectance)
+    f_ray = ptc.force_ray(theta, phi, k0, 10, E0)
+
+    print('n0: ', n0)
+    print('k0: ', k0)
+    print('d0: ', d0)
+    print('thetai: ', thetai*180/pi)
+    print('thetar: ', thetar*180/pi)
+    print('beta: ', beta*180/pi)
+    print('reflectance: ', reflectance)
+    print('reflected ray:', ref_ray)
+    print('outgoing ray:', out_ray)
+    print('Qk, Qd: ', Qk, Qd)
+    print('force: ', f_ray)
+
