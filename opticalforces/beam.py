@@ -24,7 +24,6 @@ Todo:
 import math as ma
 from math import pi
 import cmath as cm
-from functools import wraps
 import copy
 import scipy.special as ss
 from scipy.integrate import quad
@@ -108,15 +107,16 @@ class Beam(object):
         # effetuate the sum because all generic params is equal.
         beams = []
         for beam in self.beams:
-            b = copy.copy(beam)
-            b.amplitude *= self.amplitude
-            b.phase += self.phase
-            beams.append(b)
+            _beam = copy.copy(beam)
+            _beam.amplitude *= self.amplitude
+            _beam.phase += self.phase
+            beams.append(_beam)
+
         for beam in other.beams:
-            b = copy.copy(beam)
-            b.amplitude *= other.amplitude
-            b.phase += other.phase
-            beams.append(b)
+            _beam = copy.copy(beam)
+            _beam.amplitude *= other.amplitude
+            _beam.phase += other.phase
+            beams.append(_beam)
         #beams = list(self.beams) + list(other.beams)
         return Beam(beams)
 
