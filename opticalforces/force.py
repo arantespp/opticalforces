@@ -413,7 +413,8 @@ class SphericalParticle(object):
 
         force = [Qk*k + Qd*d for k, d in zip(k0, d0)]
 
-        force_factor = self.medium_refractive_index*poynting/speed_of_light
+        force_factor = (ma.cos(incident_angle)*self.medium_refractive_index
+                        *poynting/speed_of_light)
 
         return [force_factor*f for f in force]
 
@@ -527,39 +528,23 @@ class Force(object):
             test_msg()
 
             if force == 'fx':
-                return {'force': force_ray[0]*ma.sin(theta), 'eff_area': ma.sin(theta)}
+                return force_ray[0]*ma.sin(theta)
             elif force == 'fy':
-                return {'force': force_ray[1]*ma.sin(theta), 'eff_area': ma.sin(theta)}
+                return force_ray[1]*ma.sin(theta)
             elif force == 'fz':
-                return {'force': force_ray[2]*ma.sin(theta), 'eff_area': ma.sin(theta)}
+                return force_ray[2]*ma.sin(theta)
             else:
-                return {'force': 0, 'eff_area': 0}
+                return 0
 
         def integration():
-            nptheta = simps_points
-
-            theta_list = numpy.linspace(pi, 0, 1000)
-
+            theta_list = numpy.linspace(pi, 0, simps_points)
             dforce_theta = []
-            deff_area_theta = []
-
             for theta in theta_list:
-                phi_list = numpy.linspace(0, 2*pi, 20)
+                phi_list = numpy.linspace(0, 2*pi, 4)
                                        #ma.floor(nptheta*ma.sin(theta)+1))
-
-                dforce_phi = []
-                deff_area_phi = []
-                for phi in phi_list:
-                    values = integrand(theta, phi)
-                    dforce_phi.append(values['force'])
-                    deff_area_phi.append(values['eff_area'])
-
+                dforce_phi = [integrand(theta, phi) for phi in phi_list]
                 dforce_theta.append(simps(dforce_phi, phi_list))
-                deff_area_theta.append(simps(deff_area_phi, phi_list))
-
-            eff_area = simps(deff_area_theta, theta_list)
-
-            return simps(dforce_theta, theta_list)/eff_area
+            return simps(dforce_theta, theta_list)
 
         return integration()
 
@@ -583,6 +568,7 @@ if __name__ == '__main__':
     fw.L = 1*1e-3
     fw.R = 17.5e-6
     fw.Q = 0.95*fw.wavenumber
+    fw.electric_field_direction = [0, 1, 0]
     fw.reference_function = func
 
     Rp = 17.5e-6
