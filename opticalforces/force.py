@@ -387,7 +387,7 @@ class SphericalParticle(object):
 
         return Qk, Qd
 
-    def force_ray(self, theta, phi, incident_ray, power_ray, electric_field):
+    def force_ray(self, theta, phi, incident_ray, poynting, electric_field):
         if incident_ray == [0, 0, 0]:
             return [0, 0, 0]
 
@@ -413,7 +413,7 @@ class SphericalParticle(object):
 
         force = [Qk*k + Qd*d for k, d in zip(k0, d0)]
 
-        force_factor = self.medium_refractive_index*power_ray/speed_of_light
+        force_factor = self.medium_refractive_index*poynting/speed_of_light
 
         return [force_factor*f for f in force]
 
@@ -424,7 +424,7 @@ class Force(object):
 
     @classmethod
     @timing
-    @save_database('geo-opt')
+    #@save_database('geo-opt')
     def geo_opt(cls, beam, ptc, ptc_pos, force, simps_points=101):
         """ Force that beam causes in a spherical particle in a deter-
         mined position in geometrical optics regime (particle radius is
@@ -476,50 +476,69 @@ class Force(object):
             k0 = beam.wavenumber_direction(bps)
 
             # Beam's power at particle surface
-            power = beam.intensity(bps)
+            poynting = beam.intensity(bps)
 
             # Electric field direction
             E0 = beam._electric_field_direction
 
             # Force of a single ray.
+            force_ray = ptc.force_ray(theta, phi, k0, poynting, E0)
+
+            def test_msg():
+                incident_ray_abs = 1
+                n0 = ptc.normal(theta, phi)
+                d0 = ptc.ortonormal_ray_direction(k0, n0)
+                incident_angle = ptc.incident_angle(k0, n0)
+
+                refracted_angle = ptc.refracted_angle(incident_angle,
+                                                       ptc._medium_refractive_index,
+                                                       ptc._refractive_index)
+                crossing_angle = ptc.crossing_angle(k0, n0, E0)
+
+                reflectance = ptc.reflectance(incident_angle, refracted_angle,
+                                               crossing_angle)
+                Qk, Qd = ptc.Qkd(incident_angle, refracted_angle, reflectance)
+
+                msg = ''
+                msg += 'np=' + str(ptc.refractive_index) + ';\n'
+                msg += 'nm=' + str(ptc.medium_refractive_index) + ';\n'
+                msg += 'Rp=' + str(ptc.radius) + ';\n'
+                msg += 'partpos=List' + str(ptc_pos.cartesian()) + ';\n'
+                msg += 'point=List' + str(bps.cylindrical()) + ';\n'
+                msg += 'theta=' + str(theta) + ';\n'
+                msg += 'phi=' + str(phi) + ';\n'
+                msg += 'n0=List' + str(list(n0)) + ';\n'
+                msg += 'k0=List' + str(list(k0)) + ';\n'
+                msg += 'E0=List' + str(list(E0)) + ';\n'
+                msg += 'beta=' + str(crossing_angle) + ';\n'
+                msg += 'thetai=' + str(incident_angle) + ';\n'
+                msg += 'thetar=' + str(refracted_angle)  + ';\n'
+                msg += 'd0=List' + str(list(d0)) + ';\n'
+                msg += 'R=' + str(reflectance) + ';\n'
+                msg += 'Qkd=List' + str(list([Qk, Qd])) + ';\n'
+                msg += 'intensity=' + str(poynting) + ';\n'
+                msg += 'Force=List' + str(list(force_ray)) + ';\n'
+                msg = msg.replace('e-', '*10^-')
+                #pyperclip.copy(msg)
+                #pyperclip.paste()
+                print(msg)
+                time.sleep(1)
+
+            test_msg()
+
             if force == 'fx':
-                _force = ptc.force_ray(theta, phi, k0, power, E0)[0]
+                return {'force': force_ray[0]*ma.sin(theta), 'eff_area': ma.sin(theta)}
             elif force == 'fy':
-                _force = ptc.force_ray(theta, phi, k0, power, E0)[1]
+                return {'force': force_ray[1]*ma.sin(theta), 'eff_area': ma.sin(theta)}
             elif force == 'fz':
-                _force = ptc.force_ray(theta, phi, k0, power, E0)[2]
-
-            '''msg = ''
-            msg += 'np=' + str(ptc.refractive_index) + ';\n'
-            msg += 'nm=' + str(ptc.medium_refractive_index) + ';\n'
-            msg += 'Rp=' + str(ptc.radius) + ';\n'
-            msg += 'partpos=List' + str(ptc_pos.cartesian()) + ';\n'
-            msg += 'point=List' + str(bps.cylindrical()) + ';\n'
-            msg += 'theta=' + str(theta) + ';\n'
-            msg += 'phi=' + str(phi) + ';\n'
-            msg += 'n0=List' + str(ptc.normal(theta, phi)) + ';\n'
-            msg += 'k0=List' + str(list(k0)) + ';\n'
-            msg += 'E0=List' + str(list(ptc.electric_field_direction)) + ';\n'
-            msg += 'beta=' + str(ptc.crossing_angle(theta, phi)) + ';\n'
-            msg += 'thetai=' + str(ptc.incident_angle(theta, phi)) + ';\n'
-            msg += 'thetar=' + str(ptc.refracted_angle(theta, phi))  + ';\n'
-            msg += 'd0=List' + str(list(ptc.ortonormal_incident_ray(theta, phi))) + ';\n'
-            msg += 'R=' + str(ptc.reflectance(theta, phi)) + ';\n'
-            msg += 'Qkd=List' + str(list(ptc.Qkd(theta, phi))) + ';\n'
-            msg += 'intensity=' + str(beam.intensity(bps)) + ';\n'
-            msg += 'Force=List' + str(list(force)) + ';\n'
-            msg = msg.replace('e-', '*10^-')
-            pyperclip.copy(msg)
-            pyperclip.paste()
-            print(msg)
-            time.sleep(1)'''
-
-            return {'force': _force*ma.sin(theta), 'eff_area': ma.sin(theta)}
+                return {'force': force_ray[2]*ma.sin(theta), 'eff_area': ma.sin(theta)}
+            else:
+                return {'force': 0, 'eff_area': 0}
 
         def integration():
             nptheta = simps_points
 
-            theta_list = numpy.linspace(0, pi, 1000)
+            theta_list = numpy.linspace(pi, 0, 1000)
 
             dforce_theta = []
             deff_area_theta = []
@@ -548,7 +567,7 @@ class Force(object):
 if __name__ == '__main__':
     print("Please, visit: https://github.com/arantespp/opticalforces")
 
-    '''from beam import FrozenWave
+    from beam import FrozenWave
 
     fw = FrozenWave()
 
@@ -560,11 +579,11 @@ if __name__ == '__main__':
 
     fw.vacuum_wavelength = 1064e-9
     fw.medium_refractive_index = 1.33
-    fw.N = 15
+    fw.N = 1
     fw.L = 1*1e-3
     fw.R = 17.5e-6
     fw.Q = 0.95*fw.wavenumber
-    fw.referencepy_function = func'''
+    fw.reference_function = func
 
     Rp = 17.5e-6
 
@@ -575,7 +594,9 @@ if __name__ == '__main__':
     np = 1.33*1.1
     ptc.medium_refractive_index = nm
     ptc.refractive_index = np
-    theta = 2*pi/3
+
+    print(Force.geo_opt(fw, ptc, Point([0, 0, 0]), 'fz'))
+    '''theta = 2*pi/3
     phi = 0
 
     n0 = ptc.normal(theta, phi)
@@ -601,5 +622,5 @@ if __name__ == '__main__':
     print('reflected ray:', ref_ray)
     print('outgoing ray:', out_ray)
     print('Qk, Qd: ', Qk, Qd)
-    print('force: ', f_ray)
+    print('force: ', f_ray)'''
 
