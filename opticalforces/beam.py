@@ -532,7 +532,8 @@ class BesselBeam(Beam):
 
 
 class GaussianBeam(Beam):
-    intrinsic_params = ('_q',)
+    intrinsic_params = ('_q',
+                        '_waist_radius',)
 
     params = Beam.params + intrinsic_params
 
@@ -544,6 +545,7 @@ class GaussianBeam(Beam):
         self.name = 'gaussian-beam'
 
         self._q = None
+        self._waist_radius = None
 
         for key, value in kwargs.items():
             if hasattr(self, '_' + key):
@@ -554,14 +556,30 @@ class GaussianBeam(Beam):
         return self._q
 
     @q.setter
-    def q(self, q):
-        self._q = q
+    def q(self, value):
+        self._q = value
+        if value == 0:
+            self._waist_radius = ma.inf
+        else:
+            self._waist_radius = ma.sqrt(1/value)
+
+    @property
+    def waist_radius(self):
+        return self._waist_radius
+
+    @waist_radius.setter
+    def waist_radius(self, value):
+        self._waist_radius = value
+        if value == 0:
+            self._q = ma.inf
+        else:
+            self._q = 1/value**2
 
     def psi(self, point):
         k = self._wavenumber
         q = self._q
         return (self._amplitude*cm.exp(1j*self._phase)
-                *(1/(1+1j*point.z*2*q/k))*cm.exp(1j*point.z*k)
+                * (1/(1+1j*point.z*2*q/k))*cm.exp(1j*point.z*k)
                 * cm.exp((-q*point.rho**2)/(1+1j*point.z*2*q/k)))
 
 
