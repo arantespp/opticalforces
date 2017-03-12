@@ -29,6 +29,7 @@ import scipy.special as ss
 from scipy.integrate import quad
 import numpy as np
 
+import time
 
 class Beam(object):
     """ This class has all properties and methods that a specific beam
@@ -292,16 +293,16 @@ class Beam(object):
         """
 
         # Delta
-        h = 1e-10
+        h = 1e-15
 
         # Denominator coefficient
-        den = 60*h
+        den = 840*h
 
         # Locations of Sampled Points
-        lsp = [-3, -2, -1, 0, 1, 2, 3]
+        lsp = [-4, -3, -2, -1, 0, 1, 2, 3, 4]
 
         # Finite Difference Coefficients
-        fdc = [-1, 9, -45, 0, 45, -9, 1]
+        fdc = [3, -32, 168, -672, 0, 672, -168, 32, -3]
 
         # Psi calculated over samples points
         psix = [self.psi(Point([point.x+i*h, point.y, point.z])) for i in lsp]
@@ -796,7 +797,7 @@ class FrozenWave(Beam):
         self._Q = None
         self._N = None
         self._L = None
-        self._func = 'Not defined'
+        self._func = None
         self.func = None
 
         for key, value in kwargs.items():
