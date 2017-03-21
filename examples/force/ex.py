@@ -26,12 +26,12 @@ class gaussian(PlaneWave):
 
     def __init__(self):
         PlaneWave.__init__(self)
-        self.name = 'gaussian-beam'
+        self.name = 'gaussian-beam-zhang-E0y'
 
         self.params = {
             '_medium_refractive_index': 1,
             '_wavelength': 488e-9/1.33,
-            '_omega0': 0.2e-6,
+            '_omega0': 0.4e-6,
             '_P': 1e-3
         }
 
@@ -39,8 +39,8 @@ class gaussian(PlaneWave):
         self.medium_refractive_index = 1
         self._wavelength = 488e-9/1.33
         self.wavelength = 488e-9/1.33
-        self._omega0 = 0.2e-6
-        self.omega0 = 0.2e-6
+        self._omega0 = 0.4e-6
+        self.omega0 = 0.4e-6
         self._P = 1e-3
         self.P = 1e-3
         self._wavenumber = 2*ma.pi*self._medium_refractive_index/self._wavelength
@@ -55,7 +55,7 @@ class gaussian(PlaneWave):
         P = self._P
         nm = self._medium_refractive_index
 
-        E0 = ma.sqrt(2*P/(pi*omega0**2*nm*c))
+        #E0 = ma.sqrt(2*P*1.33/(pi*c))
         E0 = 1
 
         omega = omega0*ma.sqrt((1+((wl*pt.z)/(pi*omega0**2))**2))
@@ -75,12 +75,45 @@ class gaussian(PlaneWave):
         return (E0*(omega0/omega)*ma.exp(-(pt.rho/omega)**2)
                 *cm.exp(1j*Phi))
 
+    def wavenumber_direction(self, pt):
+        wl = self._wavelength
+        omega0 = self._omega0
+        k = self._wavenumber
+        P = self._P
+        nm = self._medium_refractive_index
+
+        if pt.z != 0:
+            r = pt.z*(1 + ( (pi*omega0**2)/(wl*pt.z) )**2 )
+        else:
+            r = 0
+
+        kx = k*pt.x/r
+        ky = k*pt.y/r
+        kz = (k*(1 - (2/(k*omega0)**2)*(1/(1 + ((pt.z*wl)/(pi*omega0**2))**2))
+                 - (pt.x**2+pt.y**2)/(2*r**2)*(1-(pi*omega0**2/(wl*pt.z))**2)))
+
+        k0 = [kx, ky, kz]
+
+        k0 = k0/np.linalg.norm(k0)
+
+        return k0
+
+
 # ===========================
 gb = gaussian()
+gb.electric_field_direction = [0, 1, 0]
 
 #print(gb.wavelength)
 #print(gb.nm)
 #print(gb.k)
+w0 = 0.4e-6
+gb2 = GaussianBeam()
+gb2.vacuum_wavelength = 0.488e-6
+gb2.medium_refractive_index = 1.33
+gb2.waist_radius = w0
+
+#print(gb2.wavenumber_direction(Point([3e-4, 3e-5, 12e-4])))
+#print(gb.wavenumber_direction_1(Point([3e-4, 3e-5, 12e-4])))
 
 #exit()
 
@@ -91,14 +124,14 @@ ptc = []
 particle = SphericalParticle(medium_refractive_index=1.33)
 particle.radius = Rp
 particle.refractive_index = 1.6
-particle.absorption_coefficient = 0.001e6
-ptc.append(particle)
+particle.absorption_coefficient = 0.01e6
+#ptc.append(particle)
 
 particle = SphericalParticle(medium_refractive_index=1.33)
 particle.radius = Rp
 particle.refractive_index = 1.6
-particle.absorption_coefficient = 0.02e6
-ptc.append(particle)
+particle.absorption_coefficient = 0.1e6
+#ptc.append(particle)
 
 particle = SphericalParticle(medium_refractive_index=1.33)
 particle.radius = Rp
@@ -107,35 +140,35 @@ particle.absorption_coefficient = 0.5e6
 ptc.append(particle)
 
 z=[]
-z.append(-4*Rp)
-z.append(-1*Rp)
-z.append(+2*Rp)
+#z.append(+4*Rp)
+z.append(+1*Rp)
+#z.append(-2*Rp)
 
-#print(Point(-1.54740140e-05, -1.139921e-06, -6.78348481e-07))
-#print(gb.psi(Point(-1.54740140e-05, -1.139921e-06, -6.78348481e-07)))
-#exit()
 # ===========================
-numberPoints = 2**5 + 1
+numberPoints = 2**6 + 1
+#numberPoints = 25+1
 x_initial = -3*Rp
 x_final = 3*Rp
-
-plt.figure(1)
 
 def style(i):
     if i == 0:
         return '-'
     elif i == 1:
         return '--'
-    else:
+    elif i == 2:
         return '-.'
+    else:
+        return ','
 
 def lbl(i):
     if i == 0:
         return r'$\alpha$ = 0.001'
     elif i == 1:
-        return r'$\alpha$ = 0.02'
+        return r'$\alpha$ = 0.06'
     else:
         return r'$\alpha$ = 0.5'
+
+plt.figure(1)
 
 for i in range(len(z)):
     plt.subplot(len(z), 1, i+1)
@@ -143,132 +176,44 @@ for i in range(len(z)):
     for j in range(len(ptc)):
         print('i: ', i+1, 'j: ', j+1)
         x = np.linspace(x_initial, x_final, numberPoints)
-        fx = [Force.geo_opt(gb, ptc[j], Point([x,0,z[i]]), 'fx') for x in x]
 
-        '''# get forces on x range if them have alread been calculated
-        def match(table, key_colnames):
-            all_params = {}
+        fx = [ptc[j].geo_opt_force(gb, x, pi, z[i], 'fx', 'total') if x !=0 else 0 for x in x]
+        plt.plot([x/Rp for x in x], fx, style(0), label='total')
 
-            # Beam's parameters
-            for param, value in gb.__dict__.items():
-                if param[0] == '_':
-                    all_params.update({param: value})
+        fx = [ptc[j].geo_opt_force(gb, x, pi, z[i], 'fx', 'incident') if x !=0 else 0 for x in x]
+        plt.plot([x/Rp for x in x], fx, style(1), label='incident')
 
-            # Particle's parameters
-            for param, value in ptc[j].__dict__.items():
-                if param[0] == '_':
-                    all_params.update({param: value})
+        fx = [ptc[j].geo_opt_force(gb, x, pi, z[i], 'fx', 'reflection') if x !=0 else 0 for x in x]
+        plt.plot([x/Rp for x in x], fx, style(2), label='reflection')
 
-            pt = {'z':z[i]}
+        fx = [ptc[j].geo_opt_force(gb, x, pi, z[i], 'fx', 'transmission') if x !=0 else 0 for x in x]
+        plt.plot([x/Rp for x in x], fx, style(3), label='transmission')
 
-            for key in key_colnames:
-                if key == 'fx' or key == 'fy' or key == 'fz':
-                    continue
+    plt.grid()
 
-                if key != 'x' and key != 'y' and key != 'z':
-                    if round_sig(table[key][0]) != round_sig(all_params[key]):
-                        return False
-                elif key == 'z':
-                    if round_sig(table[key][0]) != round_sig(z[i]):
-                        return False
-                else:
-                    pt[key] = round_sig(table[key][0])
+plt.legend(loc=1)
 
-            if (pt['x'] >= x_initial and pt['x'] <= x_final):
-                return True
-            else:
-                return False
+'''plt.figure(2)
 
-        table = Table.read(gb.name + '-geo-opt.fits')
+for i in range(len(z)):
+    plt.subplot(len(z), 1, i+1)
 
-        tableg = table.group_by(table.colnames)
-
-        table_match = tableg.groups.filter(match)
-
-        t = Table(names=('x', 'fx'))
-
-        for data in table_match:
-            t.add_row([data['x'], data['fx']])
-
-        t = t.group_by('x')
-
-        x = list(t['x'])
-        fx = [Force.geo_opt(gb, ptc[j], Point([x, 0, z[i]]))[0] for x in x]
-
-        # add points in x to lenght x reaches numberPoints
-        while len(x) < numberPoints:
-            # find max delta index
-            max_delta = 0
-            i_max_delta = 0
-            for k in range(len(x)-1):
-                if x[k+1] - x[k] > max_delta:
-                    max_delta = x[k+1] - x[k]
-                    i_max_delta = k
-            # insert a number in x at max interval distance
-            x.insert(i_max_delta+1, (x[i_max_delta]+x[i_max_delta+1])/2)
-            fx = [Force.geo_opt(gb, ptc[j], Point([x, 0, z[i]]))[0] for x in x]'''
+    for j in range(len(ptc)):
+        print('i: ', i+1, 'j: ', j+1)
+        x = np.linspace(x_initial, x_final, numberPoints)
+        fx = [Force.geo_opt(gb2, ptc[j], Point([x,0,z[i]]), 'fx') if x !=0 else 0 for x in x]
 
         plt.plot([x/Rp for x in x], fx, style(j), label=lbl(j))
 
     plt.grid()
 
-plt.legend(loc=1)
+plt.legend(loc=1)'''
+#title='asdasd'
+#msg = ''
+#msg += r'$\beta: 0$; '
+#msg += r'$\alpha$:' + str(0.5) + ' '
+#msg += r'$\omega_0$:' + str(0.4) + ' '
+#msg += 'E=[1, 0, 0]'
+#plt.title(msg)
+#plt.savefig(title + '-' + str(ptc[j].absorption_coefficient*1e-6) + '-' + str(round(gb.omega0*1e6,2)) + '.png')
 plt.show()
-
-
-'''rho_max = 10*gb.params['omega0']
-z_max = 2e-6
-
-rho = np.linspace(-rho_max, rho_max, 50)
-z = np.linspace(0, z_max, 50)
-
-plt.figure(1)
-
-plt.subplot(211)
-plt.plot(rho*10e6, [gb.intensity(Point(rho,0,0,'cilin')) for rho in rho])
-plt.grid()
-
-plt.subplot(212)
-plt.plot(z*10e6, [gb.intensity(Point(0,0,z)) for z in z])
-plt.grid()
-
-fig = plt.figure()
-ax = fig.gca(projection='3d')
-
-inty = [[gb.intensity(Point(rho,0,z,'cilin')) for rho in rho] for z in z]
-inty_max = max(max(inty))
-rho = [[rhoi*10e6 for rhoi in rho] for rhoj in rho]
-z = [[zj*10e6 for zi in z] for zj in z]
-
-ax.plot_surface(rho, z, inty, rstride=9, cstride=8, alpha=1)
-#cset = ax.contourf(rho, z, inty, zdir='z', offset=0, cmap=cmplt.coolwarm)
-#cset = ax.contourf(rho, z, inty, zdir='x', offset=-rho_max*10e6, cmap=cmplt.coolwarm)
-#cset = ax.contourf(rho, z, inty, zdir='y', offset=z_max*10e6, cmap=cmplt.coolwarm)
-
-ax.set_xlabel('rho')
-#ax.set_xlim(-rho_max*10e6, rho_max*10e6)
-ax.set_ylabel('z')
-#ax.set_ylim(0, z_max*10e6)
-ax.set_zlabel('I')
-#ax.set_zlim(0, inty_max)
-
-plt.show()'''
-
-'''z = np.linspace(0.05, 1.25*Zmax, 51)
-rho = np.linspace(-Rmax*1e3, Rmax*1e3, 21)
-
-INTY = [[ibb.intensity(Point(rho*1e-3, 0, z, 'cilin')) for rho in rho]
-    for z in z]
-RHO, Z = np.meshgrid(rho, z)
-
-plt.figure(1, figsize=(width*1.618, width))
-axes = plt.gca(projection='3d')
-
-axes.plot_surface(RHO, Z, INTY)
-
-axes.set_xlabel('rho')
-#ax.set_xlim(-rho_max*10e6, rho_max*10e6)
-axes.set_ylabel('z')
-#ax.set_ylim(0, z_max*10e6)
-axes.set_zlabel('I')
-#ax.set_zlim(0, inty_max)'''
