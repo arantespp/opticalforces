@@ -560,7 +560,7 @@ class GaussianBeam(Beam):
         self._q = value
         if value == 0:
             self._waist_radius = ma.inf
-        elif value.isinf():
+        elif ma.isinf(value):
             self._waist_radius = 0
         else:
             self._waist_radius = ma.sqrt(1/value)
@@ -574,7 +574,7 @@ class GaussianBeam(Beam):
         self._waist_radius = value
         if value == 0:
             self._q = ma.inf
-        elif value.isinf():
+        elif ma.isinf(value):
             self._q = 0
         else:
             self._q = 1/value**2

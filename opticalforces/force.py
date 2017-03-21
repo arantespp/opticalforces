@@ -10,10 +10,10 @@ import numpy
 
 from beam import Point
 
-import pyperclip
-
 # Speed of light.
-speed_of_light = 299792458
+SPEED_OF_LIGHT = 299792458
+
+BETA = 0
 
 def round_sig(num, sig=4):
     if num < 0:
@@ -39,9 +39,10 @@ def timing(func):
 def check_database(regime):
     def _force(func):
         @wraps(func)
-        def wrapped(self, beam, ptc, beam_pos, force, *args, **kwargs):
+        def wrapped(self, beam, rho0, phi0, z0, force, force_type):
             # Database's name
-            database_name = beam.name + '-' + force + '-' + regime + '.fits'
+            database_name = (beam.name + '-' + force + '-' + force_type
+                             + '-' + regime + '.fits')
             all_params = {}
 
             # Beam's parameters
@@ -50,14 +51,14 @@ def check_database(regime):
                     all_params.update({param: getattr(beam, param)})
 
             # Particle's parameters
-            for param in ptc.params:
-                if isinstance(getattr(ptc, param), Number) is True:
-                    all_params.update({param: getattr(ptc, param)})
+            for param in self.params:
+                if isinstance(getattr(self, param), Number) is True:
+                    all_params.update({param: getattr(self, param)})
 
             # Particle position's parameters
-            all_params.update({'x': beam_pos.x,
-                               'y': beam_pos.y,
-                               'z': beam_pos.z})
+            all_params.update({'x': rho0*ma.cos(phi0),
+                               'y': rho0*ma.sin(phi0),
+                               'z': z0})
 
             # Round 'all_params' variables
             for param, value in all_params.items():
@@ -67,7 +68,7 @@ def check_database(regime):
             all_params_WF = all_params
 
             # Force's parameters
-            all_params.update({'force': None})
+            all_params.update({force: None})
 
             # Verify if exist a database and if currently params
             # have already been calculated for this beam. if there,
@@ -78,7 +79,7 @@ def check_database(regime):
                 # Match function used to filter database.
                 def match(table, key_colnames):
                     for key in key_colnames:
-                        if key == 'force':
+                        if key == force:
                             continue
 
                         if table[key][0] != all_params_WF[key]:
@@ -91,7 +92,7 @@ def check_database(regime):
 
                     # sort by column's names except forces
                     key_names = db.colnames
-                    key_names.remove('force')
+                    key_names.remove(force)
                     db = db.group_by([key for key in key_names])
 
                     # Verify if currently forces have already been
@@ -102,7 +103,7 @@ def check_database(regime):
                     # means that at least one point have already
                     # been calculated.
                     if len(db_match) > 0:
-                        return db_match['force'][0]
+                        return db_match[force][0]
 
             except:
                 # database create
@@ -111,9 +112,9 @@ def check_database(regime):
                 db.write(database_name)
 
             # Force (:obj:'Point')
-            __force = func(self, beam, ptc, beam_pos, force, *args, **kwargs)
+            __force = func(self, beam, rho0, phi0, z0, force, force_type)
 
-            all_params['force'] = __force
+            all_params[force] = __force
 
             data_rows = [all_params[key] for key in db.colnames]
 
@@ -255,7 +256,7 @@ class SphericalParticle(object):
     def reflectivity(cls, incident_angle, refracted_angle, crossing_angle):
         Rpa = cls.parallel_reflectivity(incident_angle, refracted_angle)
         Rpe = cls.perpendicular_reflectivity(incident_angle, refracted_angle)
-        return Rpa*ma.cos(crossing_angle)**2 + Rpe*ma.sin(crossing_angle)**2
+        return Rpa*ma.sin(crossing_angle)**2 + Rpe*ma.cos(crossing_angle)**2
 
     @classmethod
     def parallel_trasmissivity(cls, incident_angle, refracted_angle):
@@ -270,85 +271,33 @@ class SphericalParticle(object):
     def trasmissivity(cls, incident_angle, refracted_angle, crossing_angle):
         Tpa = cls.parallel_trasmissivity(incident_angle, refracted_angle)
         Tpe = cls.perpendicular_trasmissivity(incident_angle, refracted_angle)
-        return Tpa*ma.cos(crossing_angle)**2 + Tpe*ma.sin(crossing_angle)**2
+        return Tpa*ma.sin(crossing_angle)**2 + Tpe*ma.cos(crossing_angle)**2
 
-    def Qkd(self, incident_angle, refracted_angle, reflectivity, trasmissivity):
+    def Qt(self, incident_angle, refracted_angle, reflectivity, trasmissivity,
+           force_type):
 
         length = 2*self._radius*ma.cos(refracted_angle)
         internal_attenuation = ma.exp(-self._absorption_coefficient*length)
 
-        den = (1 + 2*reflectivity*internal_attenuation*ma.cos(2*refracted_angle)
-               + (reflectivity*internal_attenuation)**2)
+        if force_type == 'total':
+            return (1 + reflectivity*cm.exp(-2j*incident_angle)
+                    - trasmissivity**2*internal_attenuation
+                    * cm.exp(-2j*(incident_angle-refracted_angle))
+                    / (1+reflectivity*internal_attenuation
+                       * cm.exp(+2j*refracted_angle)))
+        elif force_type == 'incident':
+            return 1
+        elif force_type == 'reflection':
+            return reflectivity*cm.exp(-2j*incident_angle)
+        elif force_type == 'transmission':
+            return (- trasmissivity**2*internal_attenuation
+                    * cm.exp(-2j*(incident_angle-refracted_angle))
+                    / (1+reflectivity*internal_attenuation
+                       * cm.exp(+2j*refracted_angle)))
 
-        if den != 0:
-            Qk = (1 + reflectivity*ma.cos(2*incident_angle)
-                  - trasmissivity**2*internal_attenuation
-                  * (ma.cos(2*(incident_angle-refracted_angle))
-                     + reflectivity*internal_attenuation
-                     * ma.cos(2*incident_angle))/den)
-
-            Qd = (0 + reflectivity*ma.sin(2*incident_angle)
-                  - trasmissivity**2*internal_attenuation
-                  * (ma.sin(2*(incident_angle-refracted_angle))
-                     + reflectivity*internal_attenuation
-                     * ma.sin(2*incident_angle))/den)
-        else:
-            Qk = (1 + reflectivity*ma.cos(2*incident_angle)
-                  - internal_attenuation
-                  * (ma.cos(2*(incident_angle-refracted_angle))
-                     + reflectivity*internal_attenuation
-                     * ma.cos(2*incident_angle)))
-
-            Qd = (0 + reflectivity*ma.sin(2*incident_angle)
-                  - internal_attenuation
-                  * (ma.sin(2*(incident_angle-refracted_angle))
-                     + reflectivity*internal_attenuation
-                     * ma.sin(2*incident_angle)))
-
-        return Qk, -Qd
-
-    def radiation_pressure_ray(self, theta, phi, incident_ray, poynting,
-            electric_field):
-        if incident_ray == [0, 0, 0]:
-            return [0, 0, 0]
-
-        n0 = self.normal(theta, phi)
-        incident_angle = self.incident_angle(incident_ray, n0)
-
-        # Check if this sphere point is being illuminated
-        if incident_angle >= pi/2:
-            return [0, 0, 0]
-
-        d0 = self.ortonormal_ray_direction(incident_ray, n0)
-        refracted_angle = self.refracted_angle(incident_angle,
-                                               self._medium_refractive_index,
-                                               self._refractive_index)
-        crossing_angle = self.crossing_angle(incident_ray, n0, electric_field)
-        #crossing_angle = 0
-        reflectivity = self.reflectivity(incident_angle, refracted_angle,
-                                       crossing_angle)
-        trasmissivity = self.trasmissivity(incident_angle, refracted_angle,
-                                           crossing_angle)
-        Qk, Qd = self.Qkd(incident_angle, refracted_angle, reflectivity,
-                          trasmissivity)
-
-        rad_press_ray = [Qk*k + Qd*d for k, d in zip(incident_ray, d0)]
-
-        factor = self._medium_refractive_index/speed_of_light
-        #factor = 1
-
-        return [factor*rpr*poynting*ma.cos(incident_angle*0)
-                for rpr in rad_press_ray]
-
-
-class Force(object):
-    def __init__(self):
-        pass
-
-    @classmethod
     @timing
-    #@check_database('new-geo-opt-minus-kds')
-    def geo_opt(cls, beam, ptc, beam_pos, force, epsrel=1e-1, limit=9999):
+    @check_database('geo-opt')
+    def geo_opt_force(self, beam, rho0, phi0, z0, force, force_type='total'):
         """ Force that beam causes in a spherical particle in a deter-
         mined position in geometrical optics regime (particle radius is
         greater than 10 times beam's wavelenght).
@@ -359,124 +308,72 @@ class Force(object):
         beam." Journal of Optics A: Pure and Applied Optics 10.8
         (2008): 085001.
 
-        Args:
-            ptc (:obj:'Particle'): spherical particle.
-            beam_pos (:obj:'Point'): point at which particle is placed.
-                Our reference O: (0,0,0) is the beam's aperture
-                center.
-
-        Returns:
-            A 'Point' containing the force vector.
-
         """
+        E0 = beam.electric_field_direction
 
-        # assert about required particle parameters
-        assert isinstance(ptc.radius, Number), \
-            ('Particle param radius not defined')
-
-        assert isinstance(ptc.refractive_index, Number), \
-            ('Particle param refractive_index not defined')
-
-        assert isinstance(ptc.absorption_coefficient, Number), \
-            ('Particle param absorption_coefficient not defined')
-
-        # assert about geometric optics force approximation condition
-        assert ptc.radius >= 9.9 * beam.wavelength, \
-            ('Particle radius length less than 10 * wavelength')
-
-        def radiation_pressure(theta, phi):
-            """ Return each infinitesimal force contribuition on sphere
-            surface as function of theta and phi at particle
-            coordinates."""
-
+        def dforce(theta, phi):
             # Beam particle surface: beam coordinates point that
             # match the point at theta and phi on particle surface.
-            bps = Point([ptc.radius, theta, phi], 'spherical')
+            bps = (Point([self.radius, theta, phi], 'spherical')
+                   + Point([rho0, pi-phi0, -z0], 'cylindrical'))
 
             # Vector parallel to the direction of a single ray.
-            k0 = beam.wavenumber_direction(bps - beam_pos)
+            k0 = beam.wavenumber_direction(bps)
 
-            # Beam's power at particle surface
-            poynting = beam.intensity(bps - beam_pos)
+            n0 = self.normal(theta, phi)
 
-            # Electric field direction
-            E0 = beam._electric_field_direction
+            thetai = self.incident_angle(k0, n0)
 
-            # Force of a single ray.
-            radiation_pressure_ray = ptc.radiation_pressure_ray(theta, phi, k0,
-                                                                poynting, E0)
+            # Check if this sphere point is being illuminated
+            if thetai >= pi/2:
+                return 0
 
-            def test_msg():
-                incident_ray_abs = 1
-                n0 = ptc.normal(theta, phi)
-                d0 = ptc.ortonormal_ray_direction(k0, n0)
-                incident_angle = ptc.incident_angle(k0, n0)
+            thetar = self.refracted_angle(thetai,
+                                          self._medium_refractive_index,
+                                          self._refractive_index)
 
-                refracted_angle = ptc.refracted_angle(incident_angle,
-                                                       ptc._medium_refractive_index,
-                                                       ptc._refractive_index)
-                crossing_angle = ptc.crossing_angle(k0, n0, E0)
+            d0 = self.ortonormal_ray_direction(k0, n0)
 
-                Rpa = ptc.parallel_reflectivity(incident_angle, refracted_angle)
-                Rpe = ptc.perpendicular_reflectivity(incident_angle, refracted_angle)
-                reflectivity = ptc.reflectivity(incident_angle, refracted_angle,
-                                               crossing_angle)
-                Tpa = ptc.parallel_trasmissivity(incident_angle, refracted_angle)
-                Tpe = ptc.perpendicular_trasmissivity(incident_angle, refracted_angle)
-                trasmissivity = ptc.trasmissivity(incident_angle, refracted_angle,
-                                                  crossing_angle)
-                Qk, Qd = ptc.Qkd(incident_angle, refracted_angle, reflectivity, trasmissivity)
+            beta = self.crossing_angle(k0, n0, E0)
 
-                msg = ''
-                msg += 'np=' + str(ptc.refractive_index) + ';\n'
-                msg += 'nm=' + str(ptc.medium_refractive_index) + ';\n'
-                msg += 'Rp=' + str(ptc.radius) + ';\n'
-                msg += 'alpha=' + str(ptc.absorption_coefficient) + ';\n'
-                msg += 'beampos=List' + str(beam_pos.cylindrical()) + ';\n'
-                msg += 'point=List' + str((bps-beam_pos).cartesian()) + ';\n'
-                msg += 'theta=' + str(theta) + ';\n'
-                msg += 'phi=' + str(phi) + ';\n'
-                msg += 'n0=List' + str(list(n0)) + ';\n'
-                msg += 'k0=List' + str(list(k0)) + ';\n'
-                msg += 'E0=List' + str(list(E0)) + ';\n'
-                msg += 'beta=' + str(crossing_angle) + ';\n'
-                msg += 'thetai=' + str(incident_angle) + ';\n'
-                msg += 'thetar=' + str(refracted_angle)  + ';\n'
-                msg += 'd0=List' + str(list(d0)) + ';\n'
-                msg += 'Rpa=' + str(Rpa) + ';\n'
-                msg += 'Rpe=' + str(Rpe) + ';\n'
-                msg += 'R=' + str(reflectivity) + ';\n'
-                msg += 'Tpa=' + str(Tpa) + ';\n'
-                msg += 'Tpe=' + str(Tpe) + ';\n'
-                msg += 'T=' + str(trasmissivity) + ';\n'
-                msg += 'Qkd=List' + str(list([Qk, Qd])) + ';\n'
-                msg += 'intensity=' + str(poynting) + ';\n'
-                msg += 'radPressure=List' + str(list(radiation_pressure_ray)) + ';\n'
-                msg = msg.replace('e-', '*10^-')
-                pyperclip.copy(msg)
-                pyperclip.paste()
+            reflectivity = self.reflectivity(thetai, thetar, beta)
 
-            #test_msg()
+            trasmissivity = self.trasmissivity(thetai, thetar, beta)
+
+            Qt = self.Qt(thetai, thetar, reflectivity, trasmissivity,
+                         force_type)
+
+            intensity = beam.intensity(bps)
+
+            dpower = intensity*ma.cos(thetai)
+
+            _dforce = [(Qt.real*k + Qt.imag*d)*self._medium_refractive_index
+                       * dpower/SPEED_OF_LIGHT for k, d in zip(k0, d0)]
 
             if force == 'fx':
-                return radiation_pressure_ray[0]*ma.sin(theta)
+                return _dforce[0]
             elif force == 'fy':
-                return radiation_pressure_ray[1]*ma.sin(theta)
+                return _dforce[1]
             elif force == 'fz':
-                return radiation_pressure_ray[2]*ma.sin(theta)
+                return _dforce[2]
             else:
                 return 0
 
         def quad_integration():
+            epsrel = 1e-3
+            epsabs = 1e-20
+            limit = 999
+
             def theta_integral(phi):
-                value, err = quad(lambda theta: radiation_pressure(theta, phi),
-                                0, pi, epsabs=0, epsrel=epsrel, limit=limit)
-                return value
+                val, err = quad(lambda theta: dforce(theta, phi)*ma.sin(theta),
+                                0, pi, epsabs=epsabs, epsrel=epsrel,
+                                limit=limit)
+                return val
 
-            value, err = quad(theta_integral, 0, 2*pi, epsabs=0, epsrel=epsrel,
-                            limit=limit)
+            val, err = quad(theta_integral, 0, 2*pi, epsabs=epsabs, limit=limit,
+                            epsrel=epsrel)
 
-            return value
+            return val
 
         return quad_integration()
 
