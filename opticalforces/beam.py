@@ -533,7 +533,8 @@ class BesselBeam(Beam):
 
 class GaussianBeam(Beam):
     intrinsic_params = ('_q',
-                        '_waist_radius',)
+                        '_spot',
+                        '_rayleigh_range',)
 
     params = Beam.params + intrinsic_params
 
@@ -545,7 +546,8 @@ class GaussianBeam(Beam):
         self.name = 'gaussian-beam'
 
         self._q = None
-        self._waist_radius = None
+        self._spot = None
+        self._rayleigh_range = None
 
         for key, value in kwargs.items():
             if hasattr(self, '_' + key):
@@ -559,19 +561,20 @@ class GaussianBeam(Beam):
     def q(self, value):
         self._q = value
         if value == 0:
-            self._waist_radius = ma.inf
+            self.spot = ma.inf
         elif ma.isinf(value):
-            self._waist_radius = 0
+            self.spot = 0
         else:
-            self._waist_radius = ma.sqrt(1/value)
+            self.spot = ma.sqrt(1/value)
 
     @property
-    def waist_radius(self):
-        return self._waist_radius
+    def spot(self):
+        return self._spot
 
-    @waist_radius.setter
-    def waist_radius(self, value):
-        self._waist_radius = value
+    @spot.setter
+    def spot(self, value):
+        self._spot = value
+        self._rayleigh_range = pi*value**2/self._wavelength
         if value == 0:
             self._q = ma.inf
         elif ma.isinf(value):
@@ -579,12 +582,59 @@ class GaussianBeam(Beam):
         else:
             self._q = 1/value**2
 
+    @property
+    def rayleigh_range(self):
+        return self._rayleigh_range
+
+    @rayleigh_range.setter
+    def rayleigh_range(self, value):
+        self._rayleigh_range = value
+        self.spot = ma.sqrt(value*self._wavelength/pi)
+
+    def waist_radius(self, point):
+        if self.rayleigh_range == 0:
+            return ma.inf
+        return self._spot*ma.sqrt(1+(point.z/self.rayleigh_range)**2)
+
+    def fwhm(self, point):
+        return self.waist_radius(point)*ma.sqrt(2*ma.log(2))
+
+    def curvature_radius(self, point):
+        if point.z == 0:
+            return ma.inf
+        return point.z*(1+(self.rayleigh_range/point.z)**2)
+
+    def gouy_phase(self, point):
+        if self.rayleigh_range == 0:
+            return pi
+        return ma.atan(point.z/self.rayleigh_range)
+
     def psi(self, point):
         k = self._wavenumber
         q = self._q
         return (self._amplitude*cm.exp(1j*self._phase)
                 * (1/(1+1j*point.z*2*q/k))*cm.exp(1j*point.z*k)
                 * cm.exp((-q*point.rho**2)/(1+1j*point.z*2*q/k)))
+
+    def wavenumber_direction(self, point):
+        wavelength = self._wavelength
+        spot = self._spot
+        wavenumber = self._wavenumber
+        curvature_radius = self.curvature_radius(point)
+
+        if ma.isinf(curvature_radius):
+            return [0, 0, 1]
+
+        k0x = point.x/curvature_radius
+        k0y = point.y/curvature_radius
+        k0z = ((1-(2/(wavenumber*spot)**2)
+                * (1/(1+((point.z*wavelength)/(pi*spot**2))**2))
+                - (point.rho**2)/(2*curvature_radius**2)
+                * (1-(pi*spot**2/(wavelength*point.z))**2)))
+
+        k0 = [k0x, k0y, k0z]
+
+        return k0/np.linalg.norm(k0)
 
 
 class BesselGaussBeam(BesselBeam, GaussianBeam):
