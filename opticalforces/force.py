@@ -13,8 +13,6 @@ from beam import Point
 # Speed of light.
 SPEED_OF_LIGHT = 299792458
 
-BETA = 0
-
 def round_sig(num, sig=4):
     if num < 0:
         num = -num
@@ -46,9 +44,9 @@ def check_database(regime):
             all_params = {}
 
             # Beam's parameters
-            for param in beam.params:
-                if isinstance(getattr(beam, param), Number) is True:
-                    all_params.update({param: getattr(beam, param)})
+            #for param in beam.params:
+            #    if isinstance(getattr(beam, param), Number) is True:
+            #        all_params.update({param: getattr(beam, param)})
 
             # Particle's parameters
             for param in self.params:
@@ -236,8 +234,9 @@ class SphericalParticle(object):
 
     @staticmethod
     def parallel_reflectivity(incident_angle, refracted_angle):
-        if incident_angle == refracted_angle:
-            return 0
+        if incident_angle == 0:
+            nrel = (self._refractive_index/self._medium_refractive_index)
+            return (n-1)/(n+1)
         if refracted_angle == pi/2:
             return 1
         return (ma.tan(incident_angle - refracted_angle)
@@ -245,8 +244,9 @@ class SphericalParticle(object):
 
     @staticmethod
     def perpendicular_reflectivity(incident_angle, refracted_angle):
-        if incident_angle == refracted_angle:
-            return 0
+        if incident_angle == 0:
+            nrel = (self._refractive_index/self._medium_refractive_index)
+            return -(n-1)/(n+1)
         if refracted_angle == pi/2:
             return 1
         return (ma.sin(incident_angle - refracted_angle)
