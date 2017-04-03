@@ -101,16 +101,17 @@ class gaussian(PlaneWave):
 
 # ===========================
 gb = gaussian()
-gb.electric_field_direction = [0, 1, 0]
 
 #print(gb.wavelength)
 #print(gb.nm)
 #print(gb.k)
 w0 = 0.4e-6
-gb2 = GaussianBeam()
-gb2.vacuum_wavelength = 0.488e-6
-gb2.medium_refractive_index = 1.33
-gb2.waist_radius = w0
+gb = GaussianBeam()
+gb.vacuum_wavelength = 0.488e-6
+gb.medium_refractive_index = 1.33
+gb.waist_radius = w0
+gb.electric_field_direction = [0, 1, 0]
+
 
 #print(gb2.wavenumber_direction(Point([3e-4, 3e-5, 12e-4])))
 #print(gb.wavenumber_direction_1(Point([3e-4, 3e-5, 12e-4])))
@@ -145,7 +146,7 @@ z.append(+1*Rp)
 #z.append(-2*Rp)
 
 # ===========================
-numberPoints = 2**6 + 1
+numberPoints = 2**3 + 1
 #numberPoints = 25+1
 x_initial = -3*Rp
 x_final = 3*Rp
@@ -158,7 +159,7 @@ def style(i):
     elif i == 2:
         return '-.'
     else:
-        return ','
+        return '-.-'
 
 def lbl(i):
     if i == 0:
