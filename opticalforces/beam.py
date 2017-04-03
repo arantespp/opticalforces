@@ -562,10 +562,10 @@ class GaussianBeam(Beam):
         self._q = value
         if value == 0:
             self.spot = ma.inf
-        elif ma.isinf(value):
+        elif cm.isinf(value):
             self.spot = 0
         else:
-            self.spot = ma.sqrt(1/value)
+            self.spot = ma.sqrt(1/value.real)
 
     @property
     def spot(self):
@@ -575,6 +575,8 @@ class GaussianBeam(Beam):
     def spot(self, value):
         self._spot = value
         self._rayleigh_range = pi*value**2/self._wavelength
+        if self._q is not None:
+            return
         if value == 0:
             self._q = ma.inf
         elif ma.isinf(value):
@@ -705,14 +707,14 @@ class BesselGaussBeamSuperposition(BesselGaussBeam):
 
         self.__create_superposition()
 
-    @property
-    def q(self):
-        return self._q
+    #@property
+    #def q(self):
+    #    return self._q
 
-    @q.setter
-    def q(self, q):
-        self._q = q
-        self.__create_superposition()
+    #@q.setter
+    #def q(self, q):
+    #    self._q = q
+    #    self.__create_superposition()
 
     @property
     def N(self):

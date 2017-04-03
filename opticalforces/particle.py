@@ -228,9 +228,14 @@ class SphericalParticle(object):
         plane_normal = numpy.cross(ray_direction, normal)
         if numpy.linalg.norm(plane_normal) == 0:
             return 0
-        plane_normal /= numpy.linalg.norm(plane_normal)
 
-        return ma.acos(abs(numpy.dot(electric_field, plane_normal)))
+        div = (numpy.dot(electric_field, plane_normal)
+               /numpy.linalg.norm(plane_normal))
+
+        if abs(div) >= 1:
+            return 0
+        else:
+            return ma.acos(abs(div))
 
     @staticmethod
     def parallel_reflectivity(incident_angle, refracted_angle):
@@ -360,8 +365,8 @@ class SphericalParticle(object):
                 return 0
 
         def quad_integration():
-            epsrel = 1e-3
-            epsabs = 1e-20
+            epsrel = 1e-2
+            epsabs = 1e-18
             limit = 999
 
             def theta_integral(phi):
