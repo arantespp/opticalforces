@@ -5,8 +5,9 @@ from numbers import Number
 from functools import wraps
 import time
 from scipy.integrate import quad
-from astropy.table import Table
+import csv
 import numpy
+import os
 
 from beam import Point
 
@@ -14,119 +15,75 @@ from beam import Point
 SPEED_OF_LIGHT = 299792458
 
 def round_sig(num, sig=4):
-    if num < 0:
-        num = -num
-        return -round(num, sig-int(ma.floor(ma.log10(num)))-1)
-    elif num > 0:
-        return +round(num, sig-int(ma.floor(ma.log10(num)))-1)
-    # num == 0
-    else:
-        return num
+    if isinstance(num, Number):
+        if num < 0:
+            num = -num
+            return -round(num, sig-int(ma.floor(ma.log10(num)))-1)
+        elif num > 0:
+            return +round(num, sig-int(ma.floor(ma.log10(num)))-1)
+        else:
+            return num
+    elif isinstance(num, list):
+        return [round_sig(element) for element in num]
 
 def timing(func):
     @wraps(func)
     def wrapped(*args, **kwargs):
-        print('start: ', time.strftime("%d %b %Y %H:%M:%S", time.localtime()))
+        print('start:', time.strftime("%d %b %Y %H:%M:%S", time.localtime()))
         time0 = time.time()
         _func = func(*args, **kwargs)
-        print('end:', time.strftime("%d %b %Y %H:%M:%S", time.localtime()))
         print('time:', time.time() - time0)
         return _func
     return wrapped
 
 def check_database(regime):
-    def _force(func):
+    def force(func):
         @wraps(func)
-        def wrapped(self, beam, rho0, phi0, z0, force, force_type):
+        def wrapped(self, beam, beam_pos, force_dir, force_type):
             # Database's name
-            database_name = (beam.name + '-' + force + '-' + force_type
-                             + '-' + regime + '.fits')
-            all_params = {}
+            database_name = self.name
+            database_name += '-' + beam.name
+            database_name += '-' + force_dir
+            database_name += '-' + force_type
+            database_name += '-' + regime
+            database_name += '.csv'
 
-            # Beam's parameters
-            #for param in beam.params:
-            #    if isinstance(getattr(beam, param), Number) is True:
-            #        all_params.update({param: getattr(beam, param)})
+            database_subdir = 'database'
 
-            # Particle's parameters
-            for param in self.params:
-                if isinstance(getattr(self, param), Number) is True:
-                    all_params.update({param: getattr(self, param)})
+            full_path = os.path.join(database_subdir, database_name)
 
-            # Particle position's parameters
-            all_params.update({'x': rho0*ma.cos(phi0),
-                               'y': rho0*ma.sin(phi0),
-                               'z': z0})
+            field_names = ['x', 'y', 'z', 'force']
 
-            # Round 'all_params' variables
-            for param, value in all_params.items():
-                all_params[param] = round_sig(value)
+            delimiter = ','
 
-            # Params without forces. We need them to filter table.
-            all_params_WF = all_params
+            _beam_pos = (str(round_sig(beam_pos.x)),
+                         str(round_sig(beam_pos.y)),
+                         str(round_sig(beam_pos.z)),)
 
-            # Force's parameters
-            all_params.update({force: None})
+            if os.path.isfile(full_path):
+                with open(full_path) as database:
+                    reader = csv.DictReader(database, delimiter=delimiter)
+                    for row in reader:
+                        if (row['x'], row['y'], row['z']) == _beam_pos:
+                            return row['force']
 
-            # Verify if exist a database and if currently params
-            # have already been calculated for this beam. if there,
-            # is no dabatase, create one.
-            try:
-                db = Table.read(database_name)
+            _force = func(self, beam, beam_pos, force_dir, force_type)
 
-                # Match function used to filter database.
-                def match(table, key_colnames):
-                    for key in key_colnames:
-                        if key == force:
-                            continue
+            with open(full_path, 'a+') as database:
+                writer = csv.DictWriter(database, fieldnames=field_names)
+                database.seek(0) #ensure you're at the start of the file..
+                if not database.read(1):
+                    writer.writeheader()
+                writer.writerow({'x': _beam_pos[0],
+                                 'y': _beam_pos[1],
+                                 'z': _beam_pos[2],
+                                 'force': _force,})
 
-                        if table[key][0] != all_params_WF[key]:
-                            return False
-
-                    return True
-
-                # If exist some value on table, search for match
-                if len(db) != 0:
-
-                    # sort by column's names except forces
-                    key_names = db.colnames
-                    key_names.remove(force)
-                    db = db.group_by([key for key in key_names])
-
-                    # Verify if currently forces have already been
-                    # calculated.
-                    db_match = db.groups.filter(match)
-
-                    # If length db_match is greater than zero,
-                    # means that at least one point have already
-                    # been calculated.
-                    if len(db_match) > 0:
-                        return db_match[force][0]
-
-            except:
-                # database create
-                db_names = [name for name in all_params]
-                db = Table(names=db_names)
-                db.write(database_name)
-
-            # Force (:obj:'Point')
-            __force = func(self, beam, rho0, phi0, z0, force, force_type)
-
-            all_params[force] = __force
-
-            data_rows = [all_params[key] for key in db.colnames]
-
-            # Add 'all_params' in a last row on database
-            db.add_row(data_rows)
-
-            # Save new database
-            db.write(database_name, overwrite=True)
-
-            return __force
+            return _force
 
         return wrapped
 
-    return _force
+    return force
 
 
 class SphericalParticle(object):
@@ -136,6 +93,8 @@ class SphericalParticle(object):
               '_absorption_coefficient',)
 
     def __init__(self, **kwargs):
+        self.name = 'spherical-particle'
+
         self._radius = None
         self._refractive_index = None
         self._medium_refractive_index = None
@@ -300,9 +259,9 @@ class SphericalParticle(object):
                     / (1+reflectivity*internal_attenuation
                        * cm.exp(+2j*refracted_angle)))
 
-    @timing
+    #@timing
     @check_database('geo-opt')
-    def geo_opt_force(self, beam, rho0, phi0, z0, force, force_type='total'):
+    def geo_opt_force(self, beam, beam_pos, force_dir, force_type='total'):
         """ Force that beam causes in a spherical particle in a deter-
         mined position in geometrical optics regime (particle radius is
         greater than 10 times beam's wavelenght).
@@ -319,8 +278,7 @@ class SphericalParticle(object):
         def dforce(theta, phi):
             # Beam particle surface: beam coordinates point that
             # match the point at theta and phi on particle surface.
-            bps = (Point([self.radius, theta, phi], 'spherical')
-                   + Point([rho0, pi-phi0, -z0], 'cylindrical'))
+            bps = Point([self.radius, theta, phi], 'spherical') - beam_pos
 
             # Vector parallel to the direction of a single ray.
             k0 = beam.wavenumber_direction(bps)
@@ -355,11 +313,11 @@ class SphericalParticle(object):
             _dforce = [(Qt.real*k + Qt.imag*d)*self._medium_refractive_index
                        * dpower/SPEED_OF_LIGHT for k, d in zip(k0, d0)]
 
-            if force == 'fx':
+            if force_dir == 'fx':
                 return _dforce[0]
-            elif force == 'fy':
+            elif force_dir == 'fy':
                 return _dforce[1]
-            elif force == 'fz':
+            elif force_dir == 'fz':
                 return _dforce[2]
             else:
                 return 0
@@ -385,3 +343,32 @@ class SphericalParticle(object):
 
 if __name__ == '__main__':
     print("Please, visit: https://github.com/arantespp/opticalforces")
+
+    from beam import FrozenWave, Point
+
+    # ----- beam definition -----
+
+    L=1e-3
+
+    fw = FrozenWave(vacuum_wavelength=1064e-9,
+                    medium_refractive_index=1.33,
+                    L=L,
+                    N=2)
+
+    fw.Q = 0.95*fw.wavenumber
+
+    def ref_func(z):
+        if abs(z) < 0.1*L:
+            return 1
+        else:
+            return 0
+
+    fw.reference_function = ref_func
+
+    # ----- particle definition
+    ptc = SphericalParticle()
+    ptc.radius = 17.5e-6
+    ptc.medium_refractive_index = 1.33
+    ptc.refractive_index = 1.6
+
+    print(ptc.geo_opt_force(fw, Point([0,0,0.01]), 'fz', 'total'))
