@@ -1,4 +1,4 @@
-name: bessel-gauss-beam-superposition
+name: tbb-E0-[1,0,0]-axic-6
     _amplitude: 1
     _phase: 0
     _electric_field_direction: [1.0, 0.0, 0.0]
@@ -6,17 +6,17 @@ name: bessel-gauss-beam-superposition
     _vacuum_wavenumber: 5905249.348852994
     _medium_refractive_index: 1.33
     _wavelength: 8.000000000000001e-07
-    _wavenumber: 7853981.63397442
-    _longitudinal_wavenumber: 7815003.817030828
-    _transversal_wavenumber: 781500.3817030768
-    _axicon_angle: 0.09966865249116204
-    _axicon_angle_degree: 5.710593137499643
+    _wavenumber: 7853981.633974461
+    _longitudinal_wavenumber: 7810956.70080791
+    _transversal_wavenumber: 820964.6307317243
+    _axicon_angle: 0.10471975511965977
+    _axicon_angle_degree: 6.0
     _bessel_order: 0
     _q: 0
     _spot: inf
     _rayleigh_range: inf
     _N: 21
-    _zmax: 0.01
+    _zmax: 0.009514364454222586
     _aperture_radius: 0.001
     _L: 3e-06
     _qr: 2000000.0
@@ -24,10 +24,10 @@ name: bessel-gauss-beam-superposition
 beam 1 (-21): bessel-gauss-beam
     _amplitude: (0.0024946904385334504-0.05486110808274386j)
     _phase: 0
-    _longitudinal_wavenumber: 7815003.817030828
-    _transversal_wavenumber: 781500.3817030768
-    _axicon_angle: 0.09966865249116186
-    _axicon_angle_degree: 5.710593137499633
+    _longitudinal_wavenumber: 7810956.70080791
+    _transversal_wavenumber: 820964.6307317243
+    _axicon_angle: 0.10471975511966022
+    _axicon_angle_degree: 6.000000000000026
     _bessel_order: 0
     _q: (2000000+43982297.1502571j)
     _spot: 0.0007071067811865475
@@ -36,10 +36,10 @@ beam 1 (-21): bessel-gauss-beam
 beam 2 (-20): bessel-gauss-beam
     _amplitude: (-0.05311214041751135+0.026325720184966022j)
     _phase: 0
-    _longitudinal_wavenumber: 7815003.817030828
-    _transversal_wavenumber: 781500.3817030768
-    _axicon_angle: 0.09966865249116186
-    _axicon_angle_degree: 5.710593137499633
+    _longitudinal_wavenumber: 7810956.70080791
+    _transversal_wavenumber: 820964.6307317243
+    _axicon_angle: 0.10471975511966022
+    _axicon_angle_degree: 6.000000000000026
     _bessel_order: 0
     _q: (2000000+41887902.04786391j)
     _spot: 0.0007071067811865475
@@ -48,10 +48,10 @@ beam 2 (-20): bessel-gauss-beam
 beam 3 (-19): bessel-gauss-beam
     _amplitude: (0.05292379764368689+0.03304059293822445j)
     _phase: 0
-    _longitudinal_wavenumber: 7815003.817030828
-    _transversal_wavenumber: 781500.3817030768
-    _axicon_angle: 0.09966865249116186
-    _axicon_angle_degree: 5.710593137499633
+    _longitudinal_wavenumber: 7810956.70080791
+    _transversal_wavenumber: 820964.6307317243
+    _axicon_angle: 0.10471975511966022
+    _axicon_angle_degree: 6.000000000000026
     _bessel_order: 0
     _q: (2000000+39793506.94547071j)
     _spot: 0.0007071067811865475
@@ -60,10 +60,10 @@ beam 3 (-19): bessel-gauss-beam
 beam 4 (-18): bessel-gauss-beam
     _amplitude: (0.0033930225393439535-0.06395696809840713j)
     _phase: 0
-    _longitudinal_wavenumber: 7815003.817030828
-    _transversal_wavenumber: 781500.3817030768
-    _axicon_angle: 0.09966865249116186
-    _axicon_angle_degree: 5.710593137499633
+    _longitudinal_wavenumber: 7810956.70080791
+    _transversal_wavenumber: 820964.6307317243
+    _axicon_angle: 0.10471975511966022
+    _axicon_angle_degree: 6.000000000000026
     _bessel_order: 0
     _q: (2000000+37699111.84307752j)
     _spot: 0.0007071067811865475
@@ -72,10 +72,10 @@ beam 4 (-18): bessel-gauss-beam
 beam 5 (-17): bessel-gauss-beam
     _amplitude: (-0.06271552987486088+0.030431990722580606j)
     _phase: 0
-    _longitudinal_wavenumber: 7815003.817030828
-    _transversal_wavenumber: 781500.3817030768
-    _axicon_angle: 0.09966865249116186
-    _axicon_angle_degree: 5.710593137499633
+    _longitudinal_wavenumber: 7810956.70080791
+    _transversal_wavenumber: 820964.6307317243
+    _axicon_angle: 0.10471975511966022
+    _axicon_angle_degree: 6.000000000000026
     _bessel_order: 0
     _q: (2000000+35604716.74068432j)
     _spot: 0.0007071067811865475
@@ -84,10 +84,10 @@ beam 5 (-17): bessel-gauss-beam
 beam 6 (-16): bessel-gauss-beam
     _amplitude: (0.06244335687578112+0.039803860954583006j)
     _phase: 0
-    _longitudinal_wavenumber: 7815003.817030828
-    _transversal_wavenumber: 781500.3817030768
-    _axicon_angle: 0.09966865249116186
-    _axicon_angle_degree: 5.710593137499633
+    _longitudinal_wavenumber: 7810956.70080791
+    _transversal_wavenumber: 820964.6307317243
+    _axicon_angle: 0.10471975511966022
+    _axicon_angle_degree: 6.000000000000026
     _bessel_order: 0
     _q: (2000000+33510321.638291124j)
     _spot: 0.0007071067811865475
@@ -96,10 +96,10 @@ beam 6 (-16): bessel-gauss-beam
 beam 7 (-15): bessel-gauss-beam
     _amplitude: (0.004879926262845956-0.07665370248708973j)
     _phase: 0
-    _longitudinal_wavenumber: 7815003.817030828
-    _transversal_wavenumber: 781500.3817030768
-    _axicon_angle: 0.09966865249116186
-    _axicon_angle_degree: 5.710593137499633
+    _longitudinal_wavenumber: 7810956.70080791
+    _transversal_wavenumber: 820964.6307317243
+    _axicon_angle: 0.10471975511966022
+    _axicon_angle_degree: 6.000000000000026
     _bessel_order: 0
     _q: (2000000+31415926.53589793j)
     _spot: 0.0007071067811865475
@@ -108,10 +108,10 @@ beam 7 (-15): bessel-gauss-beam
 beam 8 (-14): bessel-gauss-beam
     _amplitude: (-0.07653507869566722+0.03601051037479193j)
     _phase: 0
-    _longitudinal_wavenumber: 7815003.817030828
-    _transversal_wavenumber: 781500.3817030768
-    _axicon_angle: 0.09966865249116186
-    _axicon_angle_degree: 5.710593137499633
+    _longitudinal_wavenumber: 7810956.70080791
+    _transversal_wavenumber: 820964.6307317243
+    _axicon_angle: 0.10471975511966022
+    _axicon_angle_degree: 6.000000000000026
     _bessel_order: 0
     _q: (2000000+29321531.433504734j)
     _spot: 0.0007071067811865475
@@ -120,10 +120,10 @@ beam 8 (-14): bessel-gauss-beam
 beam 9 (-13): bessel-gauss-beam
     _amplitude: (0.07610491550588208+0.049992892522404124j)
     _phase: 0
-    _longitudinal_wavenumber: 7815003.817030828
-    _transversal_wavenumber: 781500.3817030768
-    _axicon_angle: 0.09966865249116186
-    _axicon_angle_degree: 5.710593137499633
+    _longitudinal_wavenumber: 7810956.70080791
+    _transversal_wavenumber: 820964.6307317243
+    _axicon_angle: 0.10471975511966022
+    _axicon_angle_degree: 6.000000000000026
     _bessel_order: 0
     _q: (2000000+27227136.331111543j)
     _spot: 0.0007071067811865475
@@ -132,10 +132,10 @@ beam 9 (-13): bessel-gauss-beam
 beam 10 (-12): bessel-gauss-beam
     _amplitude: (0.00760761151703705-0.09560006581316047j)
     _phase: 0
-    _longitudinal_wavenumber: 7815003.817030828
-    _transversal_wavenumber: 781500.3817030768
-    _axicon_angle: 0.09966865249116186
-    _axicon_angle_degree: 5.710593137499633
+    _longitudinal_wavenumber: 7810956.70080791
+    _transversal_wavenumber: 820964.6307317243
+    _axicon_angle: 0.10471975511966022
+    _axicon_angle_degree: 6.000000000000026
     _bessel_order: 0
     _q: (2000000+25132741.228718344j)
     _spot: 0.0007071067811865475
@@ -144,10 +144,10 @@ beam 10 (-12): bessel-gauss-beam
 beam 11 (-11): bessel-gauss-beam
     _amplitude: (-0.09809835768355173+0.04395961187326745j)
     _phase: 0
-    _longitudinal_wavenumber: 7815003.817030828
-    _transversal_wavenumber: 781500.3817030768
-    _axicon_angle: 0.09966865249116186
-    _axicon_angle_degree: 5.710593137499633
+    _longitudinal_wavenumber: 7810956.70080791
+    _transversal_wavenumber: 820964.6307317243
+    _axicon_angle: 0.10471975511966022
+    _axicon_angle_degree: 6.000000000000026
     _bessel_order: 0
     _q: (2000000+23038346.126325145j)
     _spot: 0.0007071067811865475
@@ -156,10 +156,10 @@ beam 11 (-11): bessel-gauss-beam
 beam 12 (-10): bessel-gauss-beam
     _amplitude: (0.097310824581358+0.0670157754303966j)
     _phase: 0
-    _longitudinal_wavenumber: 7815003.817030828
-    _transversal_wavenumber: 781500.3817030768
-    _axicon_angle: 0.09966865249116186
-    _axicon_angle_degree: 5.710593137499633
+    _longitudinal_wavenumber: 7810956.70080791
+    _transversal_wavenumber: 820964.6307317243
+    _axicon_angle: 0.10471975511966022
+    _axicon_angle_degree: 6.000000000000026
     _bessel_order: 0
     _q: (2000000+20943951.023931954j)
     _spot: 0.0007071067811865475
@@ -168,10 +168,10 @@ beam 12 (-10): bessel-gauss-beam
 beam 13 (-9): bessel-gauss-beam
     _amplitude: (0.013458770875634019-0.12684592712772122j)
     _phase: 0
-    _longitudinal_wavenumber: 7815003.817030828
-    _transversal_wavenumber: 781500.3817030768
-    _axicon_angle: 0.09966865249116186
-    _axicon_angle_degree: 5.710593137499633
+    _longitudinal_wavenumber: 7810956.70080791
+    _transversal_wavenumber: 820964.6307317243
+    _axicon_angle: 0.10471975511966022
+    _axicon_angle_degree: 6.000000000000026
     _bessel_order: 0
     _q: (2000000+18849555.92153876j)
     _spot: 0.0007071067811865475
@@ -180,10 +180,10 @@ beam 13 (-9): bessel-gauss-beam
 beam 14 (-8): bessel-gauss-beam
     _amplitude: (-0.13630854646300242+0.05588346101019921j)
     _phase: 0
-    _longitudinal_wavenumber: 7815003.817030828
-    _transversal_wavenumber: 781500.3817030768
-    _axicon_angle: 0.09966865249116186
-    _axicon_angle_degree: 5.710593137499633
+    _longitudinal_wavenumber: 7810956.70080791
+    _transversal_wavenumber: 820964.6307317243
+    _axicon_angle: 0.10471975511966022
+    _axicon_angle_degree: 6.000000000000026
     _bessel_order: 0
     _q: (2000000+16755160.819145562j)
     _spot: 0.0007071067811865475
@@ -192,10 +192,10 @@ beam 14 (-8): bessel-gauss-beam
 beam 15 (-7): bessel-gauss-beam
     _amplitude: (0.1344070202442532+0.1007974302516988j)
     _phase: 0
-    _longitudinal_wavenumber: 7815003.817030828
-    _transversal_wavenumber: 781500.3817030768
-    _axicon_angle: 0.09966865249116186
-    _axicon_angle_degree: 5.710593137499633
+    _longitudinal_wavenumber: 7810956.70080791
+    _transversal_wavenumber: 820964.6307317243
+    _axicon_angle: 0.10471975511966022
+    _axicon_angle_degree: 6.000000000000026
     _bessel_order: 0
     _q: (2000000+14660765.716752367j)
     _spot: 0.0007071067811865475
@@ -204,10 +204,10 @@ beam 15 (-7): bessel-gauss-beam
 beam 16 (-6): bessel-gauss-beam
     _amplitude: (0.02986661882632932-0.18765750058472844j)
     _phase: 0
-    _longitudinal_wavenumber: 7815003.817030828
-    _transversal_wavenumber: 781500.3817030768
-    _axicon_angle: 0.09966865249116186
-    _axicon_angle_degree: 5.710593137499633
+    _longitudinal_wavenumber: 7810956.70080791
+    _transversal_wavenumber: 820964.6307317243
+    _axicon_angle: 0.10471975511966022
+    _axicon_angle_degree: 6.000000000000026
     _bessel_order: 0
     _q: (2000000+12566370.614359172j)
     _spot: 0.0007071067811865475
@@ -216,10 +216,10 @@ beam 16 (-6): bessel-gauss-beam
 beam 17 (-5): bessel-gauss-beam
     _amplitude: (-0.22139390551733398+0.07316343104242394j)
     _phase: 0
-    _longitudinal_wavenumber: 7815003.817030828
-    _transversal_wavenumber: 781500.3817030768
-    _axicon_angle: 0.09966865249116186
-    _axicon_angle_degree: 5.710593137499633
+    _longitudinal_wavenumber: 7810956.70080791
+    _transversal_wavenumber: 820964.6307317243
+    _axicon_angle: 0.10471975511966022
+    _axicon_angle_degree: 6.000000000000026
     _bessel_order: 0
     _q: (2000000+10471975.511965977j)
     _spot: 0.0007071067811865475
@@ -228,10 +228,10 @@ beam 17 (-5): bessel-gauss-beam
 beam 18 (-4): bessel-gauss-beam
     _amplitude: (0.21270228025729995+0.19508711941808535j)
     _phase: 0
-    _longitudinal_wavenumber: 7815003.817030828
-    _transversal_wavenumber: 781500.3817030768
-    _axicon_angle: 0.09966865249116186
-    _axicon_angle_degree: 5.710593137499633
+    _longitudinal_wavenumber: 7810956.70080791
+    _transversal_wavenumber: 820964.6307317243
+    _axicon_angle: 0.10471975511966022
+    _axicon_angle_degree: 6.000000000000026
     _bessel_order: 0
     _q: (2000000+8377580.409572781j)
     _spot: 0.0007071067811865475
@@ -240,10 +240,10 @@ beam 18 (-4): bessel-gauss-beam
 beam 19 (-3): bessel-gauss-beam
     _amplitude: (0.11122331822501041-0.34941835944357386j)
     _phase: 0
-    _longitudinal_wavenumber: 7815003.817030828
-    _transversal_wavenumber: 781500.3817030768
-    _axicon_angle: 0.09966865249116186
-    _axicon_angle_degree: 5.710593137499633
+    _longitudinal_wavenumber: 7810956.70080791
+    _transversal_wavenumber: 820964.6307317243
+    _axicon_angle: 0.10471975511966022
+    _axicon_angle_degree: 6.000000000000026
     _bessel_order: 0
     _q: (2000000+6283185.307179586j)
     _spot: 0.0007071067811865475
@@ -252,10 +252,10 @@ beam 19 (-3): bessel-gauss-beam
 beam 20 (-2): bessel-gauss-beam
     _amplitude: (-0.5345037307339436+0.03340964836447089j)
     _phase: 0
-    _longitudinal_wavenumber: 7815003.817030828
-    _transversal_wavenumber: 781500.3817030768
-    _axicon_angle: 0.09966865249116186
-    _axicon_angle_degree: 5.710593137499633
+    _longitudinal_wavenumber: 7810956.70080791
+    _transversal_wavenumber: 820964.6307317243
+    _axicon_angle: 0.10471975511966022
+    _axicon_angle_degree: 6.000000000000026
     _bessel_order: 0
     _q: (2000000+4188790.2047863905j)
     _spot: 0.0007071067811865475
@@ -264,10 +264,10 @@ beam 20 (-2): bessel-gauss-beam
 beam 21 (-1): bessel-gauss-beam
     _amplitude: (0.25413948884222143+0.819918097117663j)
     _phase: 0
-    _longitudinal_wavenumber: 7815003.817030828
-    _transversal_wavenumber: 781500.3817030768
-    _axicon_angle: 0.09966865249116186
-    _axicon_angle_degree: 5.710593137499633
+    _longitudinal_wavenumber: 7810956.70080791
+    _transversal_wavenumber: 820964.6307317243
+    _axicon_angle: 0.10471975511966022
+    _axicon_angle_degree: 6.000000000000026
     _bessel_order: 0
     _q: (2000000+2094395.1023931953j)
     _spot: 0.0007071067811865475
@@ -276,10 +276,10 @@ beam 21 (-1): bessel-gauss-beam
 beam 22 (0): bessel-gauss-beam
     _amplitude: (1.2089534692823396+0j)
     _phase: 0
-    _longitudinal_wavenumber: 7815003.817030828
-    _transversal_wavenumber: 781500.3817030768
-    _axicon_angle: 0.09966865249116186
-    _axicon_angle_degree: 5.710593137499633
+    _longitudinal_wavenumber: 7810956.70080791
+    _transversal_wavenumber: 820964.6307317243
+    _axicon_angle: 0.10471975511966022
+    _axicon_angle_degree: 6.000000000000026
     _bessel_order: 0
     _q: (2000000+0j)
     _spot: 0.0007071067811865475
@@ -288,10 +288,10 @@ beam 22 (0): bessel-gauss-beam
 beam 23 (1): bessel-gauss-beam
     _amplitude: (0.25413948884222143-0.819918097117663j)
     _phase: 0
-    _longitudinal_wavenumber: 7815003.817030828
-    _transversal_wavenumber: 781500.3817030768
-    _axicon_angle: 0.09966865249116186
-    _axicon_angle_degree: 5.710593137499633
+    _longitudinal_wavenumber: 7810956.70080791
+    _transversal_wavenumber: 820964.6307317243
+    _axicon_angle: 0.10471975511966022
+    _axicon_angle_degree: 6.000000000000026
     _bessel_order: 0
     _q: (2000000-2094395.1023931953j)
     _spot: 0.0007071067811865475
@@ -300,10 +300,10 @@ beam 23 (1): bessel-gauss-beam
 beam 24 (2): bessel-gauss-beam
     _amplitude: (-0.5345037307339436-0.03340964836447089j)
     _phase: 0
-    _longitudinal_wavenumber: 7815003.817030828
-    _transversal_wavenumber: 781500.3817030768
-    _axicon_angle: 0.09966865249116186
-    _axicon_angle_degree: 5.710593137499633
+    _longitudinal_wavenumber: 7810956.70080791
+    _transversal_wavenumber: 820964.6307317243
+    _axicon_angle: 0.10471975511966022
+    _axicon_angle_degree: 6.000000000000026
     _bessel_order: 0
     _q: (2000000-4188790.2047863905j)
     _spot: 0.0007071067811865475
@@ -312,10 +312,10 @@ beam 24 (2): bessel-gauss-beam
 beam 25 (3): bessel-gauss-beam
     _amplitude: (0.11122331822501041+0.34941835944357386j)
     _phase: 0
-    _longitudinal_wavenumber: 7815003.817030828
-    _transversal_wavenumber: 781500.3817030768
-    _axicon_angle: 0.09966865249116186
-    _axicon_angle_degree: 5.710593137499633
+    _longitudinal_wavenumber: 7810956.70080791
+    _transversal_wavenumber: 820964.6307317243
+    _axicon_angle: 0.10471975511966022
+    _axicon_angle_degree: 6.000000000000026
     _bessel_order: 0
     _q: (2000000-6283185.307179586j)
     _spot: 0.0007071067811865475
@@ -324,10 +324,10 @@ beam 25 (3): bessel-gauss-beam
 beam 26 (4): bessel-gauss-beam
     _amplitude: (0.21270228025729995-0.19508711941808535j)
     _phase: 0
-    _longitudinal_wavenumber: 7815003.817030828
-    _transversal_wavenumber: 781500.3817030768
-    _axicon_angle: 0.09966865249116186
-    _axicon_angle_degree: 5.710593137499633
+    _longitudinal_wavenumber: 7810956.70080791
+    _transversal_wavenumber: 820964.6307317243
+    _axicon_angle: 0.10471975511966022
+    _axicon_angle_degree: 6.000000000000026
     _bessel_order: 0
     _q: (2000000-8377580.409572781j)
     _spot: 0.0007071067811865475
@@ -336,10 +336,10 @@ beam 26 (4): bessel-gauss-beam
 beam 27 (5): bessel-gauss-beam
     _amplitude: (-0.22139390551733398-0.07316343104242394j)
     _phase: 0
-    _longitudinal_wavenumber: 7815003.817030828
-    _transversal_wavenumber: 781500.3817030768
-    _axicon_angle: 0.09966865249116186
-    _axicon_angle_degree: 5.710593137499633
+    _longitudinal_wavenumber: 7810956.70080791
+    _transversal_wavenumber: 820964.6307317243
+    _axicon_angle: 0.10471975511966022
+    _axicon_angle_degree: 6.000000000000026
     _bessel_order: 0
     _q: (2000000-10471975.511965977j)
     _spot: 0.0007071067811865475
@@ -348,10 +348,10 @@ beam 27 (5): bessel-gauss-beam
 beam 28 (6): bessel-gauss-beam
     _amplitude: (0.02986661882632932+0.18765750058472844j)
     _phase: 0
-    _longitudinal_wavenumber: 7815003.817030828
-    _transversal_wavenumber: 781500.3817030768
-    _axicon_angle: 0.09966865249116186
-    _axicon_angle_degree: 5.710593137499633
+    _longitudinal_wavenumber: 7810956.70080791
+    _transversal_wavenumber: 820964.6307317243
+    _axicon_angle: 0.10471975511966022
+    _axicon_angle_degree: 6.000000000000026
     _bessel_order: 0
     _q: (2000000-12566370.614359172j)
     _spot: 0.0007071067811865475
@@ -360,10 +360,10 @@ beam 28 (6): bessel-gauss-beam
 beam 29 (7): bessel-gauss-beam
     _amplitude: (0.1344070202442532-0.1007974302516988j)
     _phase: 0
-    _longitudinal_wavenumber: 7815003.817030828
-    _transversal_wavenumber: 781500.3817030768
-    _axicon_angle: 0.09966865249116186
-    _axicon_angle_degree: 5.710593137499633
+    _longitudinal_wavenumber: 7810956.70080791
+    _transversal_wavenumber: 820964.6307317243
+    _axicon_angle: 0.10471975511966022
+    _axicon_angle_degree: 6.000000000000026
     _bessel_order: 0
     _q: (2000000-14660765.716752367j)
     _spot: 0.0007071067811865475
@@ -372,10 +372,10 @@ beam 29 (7): bessel-gauss-beam
 beam 30 (8): bessel-gauss-beam
     _amplitude: (-0.13630854646300242-0.05588346101019921j)
     _phase: 0
-    _longitudinal_wavenumber: 7815003.817030828
-    _transversal_wavenumber: 781500.3817030768
-    _axicon_angle: 0.09966865249116186
-    _axicon_angle_degree: 5.710593137499633
+    _longitudinal_wavenumber: 7810956.70080791
+    _transversal_wavenumber: 820964.6307317243
+    _axicon_angle: 0.10471975511966022
+    _axicon_angle_degree: 6.000000000000026
     _bessel_order: 0
     _q: (2000000-16755160.819145562j)
     _spot: 0.0007071067811865475
@@ -384,10 +384,10 @@ beam 30 (8): bessel-gauss-beam
 beam 31 (9): bessel-gauss-beam
     _amplitude: (0.013458770875634019+0.12684592712772122j)
     _phase: 0
-    _longitudinal_wavenumber: 7815003.817030828
-    _transversal_wavenumber: 781500.3817030768
-    _axicon_angle: 0.09966865249116186
-    _axicon_angle_degree: 5.710593137499633
+    _longitudinal_wavenumber: 7810956.70080791
+    _transversal_wavenumber: 820964.6307317243
+    _axicon_angle: 0.10471975511966022
+    _axicon_angle_degree: 6.000000000000026
     _bessel_order: 0
     _q: (2000000-18849555.92153876j)
     _spot: 0.0007071067811865475
@@ -396,10 +396,10 @@ beam 31 (9): bessel-gauss-beam
 beam 32 (10): bessel-gauss-beam
     _amplitude: (0.097310824581358-0.0670157754303966j)
     _phase: 0
-    _longitudinal_wavenumber: 7815003.817030828
-    _transversal_wavenumber: 781500.3817030768
-    _axicon_angle: 0.09966865249116186
-    _axicon_angle_degree: 5.710593137499633
+    _longitudinal_wavenumber: 7810956.70080791
+    _transversal_wavenumber: 820964.6307317243
+    _axicon_angle: 0.10471975511966022
+    _axicon_angle_degree: 6.000000000000026
     _bessel_order: 0
     _q: (2000000-20943951.023931954j)
     _spot: 0.0007071067811865475
@@ -408,10 +408,10 @@ beam 32 (10): bessel-gauss-beam
 beam 33 (11): bessel-gauss-beam
     _amplitude: (-0.09809835768355173-0.04395961187326745j)
     _phase: 0
-    _longitudinal_wavenumber: 7815003.817030828
-    _transversal_wavenumber: 781500.3817030768
-    _axicon_angle: 0.09966865249116186
-    _axicon_angle_degree: 5.710593137499633
+    _longitudinal_wavenumber: 7810956.70080791
+    _transversal_wavenumber: 820964.6307317243
+    _axicon_angle: 0.10471975511966022
+    _axicon_angle_degree: 6.000000000000026
     _bessel_order: 0
     _q: (2000000-23038346.126325145j)
     _spot: 0.0007071067811865475
@@ -420,10 +420,10 @@ beam 33 (11): bessel-gauss-beam
 beam 34 (12): bessel-gauss-beam
     _amplitude: (0.00760761151703705+0.09560006581316047j)
     _phase: 0
-    _longitudinal_wavenumber: 7815003.817030828
-    _transversal_wavenumber: 781500.3817030768
-    _axicon_angle: 0.09966865249116186
-    _axicon_angle_degree: 5.710593137499633
+    _longitudinal_wavenumber: 7810956.70080791
+    _transversal_wavenumber: 820964.6307317243
+    _axicon_angle: 0.10471975511966022
+    _axicon_angle_degree: 6.000000000000026
     _bessel_order: 0
     _q: (2000000-25132741.228718344j)
     _spot: 0.0007071067811865475
@@ -432,10 +432,10 @@ beam 34 (12): bessel-gauss-beam
 beam 35 (13): bessel-gauss-beam
     _amplitude: (0.07610491550588208-0.049992892522404124j)
     _phase: 0
-    _longitudinal_wavenumber: 7815003.817030828
-    _transversal_wavenumber: 781500.3817030768
-    _axicon_angle: 0.09966865249116186
-    _axicon_angle_degree: 5.710593137499633
+    _longitudinal_wavenumber: 7810956.70080791
+    _transversal_wavenumber: 820964.6307317243
+    _axicon_angle: 0.10471975511966022
+    _axicon_angle_degree: 6.000000000000026
     _bessel_order: 0
     _q: (2000000-27227136.331111543j)
     _spot: 0.0007071067811865475
@@ -444,10 +444,10 @@ beam 35 (13): bessel-gauss-beam
 beam 36 (14): bessel-gauss-beam
     _amplitude: (-0.07653507869566722-0.03601051037479193j)
     _phase: 0
-    _longitudinal_wavenumber: 7815003.817030828
-    _transversal_wavenumber: 781500.3817030768
-    _axicon_angle: 0.09966865249116186
-    _axicon_angle_degree: 5.710593137499633
+    _longitudinal_wavenumber: 7810956.70080791
+    _transversal_wavenumber: 820964.6307317243
+    _axicon_angle: 0.10471975511966022
+    _axicon_angle_degree: 6.000000000000026
     _bessel_order: 0
     _q: (2000000-29321531.433504734j)
     _spot: 0.0007071067811865475
@@ -456,10 +456,10 @@ beam 36 (14): bessel-gauss-beam
 beam 37 (15): bessel-gauss-beam
     _amplitude: (0.004879926262845956+0.07665370248708973j)
     _phase: 0
-    _longitudinal_wavenumber: 7815003.817030828
-    _transversal_wavenumber: 781500.3817030768
-    _axicon_angle: 0.09966865249116186
-    _axicon_angle_degree: 5.710593137499633
+    _longitudinal_wavenumber: 7810956.70080791
+    _transversal_wavenumber: 820964.6307317243
+    _axicon_angle: 0.10471975511966022
+    _axicon_angle_degree: 6.000000000000026
     _bessel_order: 0
     _q: (2000000-31415926.53589793j)
     _spot: 0.0007071067811865475
@@ -468,10 +468,10 @@ beam 37 (15): bessel-gauss-beam
 beam 38 (16): bessel-gauss-beam
     _amplitude: (0.06244335687578112-0.039803860954583006j)
     _phase: 0
-    _longitudinal_wavenumber: 7815003.817030828
-    _transversal_wavenumber: 781500.3817030768
-    _axicon_angle: 0.09966865249116186
-    _axicon_angle_degree: 5.710593137499633
+    _longitudinal_wavenumber: 7810956.70080791
+    _transversal_wavenumber: 820964.6307317243
+    _axicon_angle: 0.10471975511966022
+    _axicon_angle_degree: 6.000000000000026
     _bessel_order: 0
     _q: (2000000-33510321.638291124j)
     _spot: 0.0007071067811865475
@@ -480,10 +480,10 @@ beam 38 (16): bessel-gauss-beam
 beam 39 (17): bessel-gauss-beam
     _amplitude: (-0.06271552987486088-0.030431990722580606j)
     _phase: 0
-    _longitudinal_wavenumber: 7815003.817030828
-    _transversal_wavenumber: 781500.3817030768
-    _axicon_angle: 0.09966865249116186
-    _axicon_angle_degree: 5.710593137499633
+    _longitudinal_wavenumber: 7810956.70080791
+    _transversal_wavenumber: 820964.6307317243
+    _axicon_angle: 0.10471975511966022
+    _axicon_angle_degree: 6.000000000000026
     _bessel_order: 0
     _q: (2000000-35604716.74068432j)
     _spot: 0.0007071067811865475
@@ -492,10 +492,10 @@ beam 39 (17): bessel-gauss-beam
 beam 40 (18): bessel-gauss-beam
     _amplitude: (0.0033930225393439535+0.06395696809840713j)
     _phase: 0
-    _longitudinal_wavenumber: 7815003.817030828
-    _transversal_wavenumber: 781500.3817030768
-    _axicon_angle: 0.09966865249116186
-    _axicon_angle_degree: 5.710593137499633
+    _longitudinal_wavenumber: 7810956.70080791
+    _transversal_wavenumber: 820964.6307317243
+    _axicon_angle: 0.10471975511966022
+    _axicon_angle_degree: 6.000000000000026
     _bessel_order: 0
     _q: (2000000-37699111.84307752j)
     _spot: 0.0007071067811865475
@@ -504,10 +504,10 @@ beam 40 (18): bessel-gauss-beam
 beam 41 (19): bessel-gauss-beam
     _amplitude: (0.05292379764368689-0.03304059293822445j)
     _phase: 0
-    _longitudinal_wavenumber: 7815003.817030828
-    _transversal_wavenumber: 781500.3817030768
-    _axicon_angle: 0.09966865249116186
-    _axicon_angle_degree: 5.710593137499633
+    _longitudinal_wavenumber: 7810956.70080791
+    _transversal_wavenumber: 820964.6307317243
+    _axicon_angle: 0.10471975511966022
+    _axicon_angle_degree: 6.000000000000026
     _bessel_order: 0
     _q: (2000000-39793506.94547071j)
     _spot: 0.0007071067811865475
@@ -516,10 +516,10 @@ beam 41 (19): bessel-gauss-beam
 beam 42 (20): bessel-gauss-beam
     _amplitude: (-0.05311214041751135-0.026325720184966022j)
     _phase: 0
-    _longitudinal_wavenumber: 7815003.817030828
-    _transversal_wavenumber: 781500.3817030768
-    _axicon_angle: 0.09966865249116186
-    _axicon_angle_degree: 5.710593137499633
+    _longitudinal_wavenumber: 7810956.70080791
+    _transversal_wavenumber: 820964.6307317243
+    _axicon_angle: 0.10471975511966022
+    _axicon_angle_degree: 6.000000000000026
     _bessel_order: 0
     _q: (2000000-41887902.04786391j)
     _spot: 0.0007071067811865475
@@ -528,10 +528,10 @@ beam 42 (20): bessel-gauss-beam
 beam 43 (21): bessel-gauss-beam
     _amplitude: (0.0024946904385334504+0.05486110808274386j)
     _phase: 0
-    _longitudinal_wavenumber: 7815003.817030828
-    _transversal_wavenumber: 781500.3817030768
-    _axicon_angle: 0.09966865249116186
-    _axicon_angle_degree: 5.710593137499633
+    _longitudinal_wavenumber: 7810956.70080791
+    _transversal_wavenumber: 820964.6307317243
+    _axicon_angle: 0.10471975511966022
+    _axicon_angle_degree: 6.000000000000026
     _bessel_order: 0
     _q: (2000000-43982297.1502571j)
     _spot: 0.0007071067811865475
