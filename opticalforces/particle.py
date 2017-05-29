@@ -65,7 +65,7 @@ def check_database(regime):
                     reader = csv.DictReader(database, delimiter=delimiter)
                     for row in reader:
                         if (row['x'], row['y'], row['z']) == _beam_pos:
-                            return row['force']
+                            return float(row['force'])
 
             _force = func(self, beam, beam_pos, force_dir, force_type)
 
@@ -259,7 +259,7 @@ class SphericalParticle(object):
                     / (1+reflectivity*internal_attenuation
                        * cm.exp(+2j*refracted_angle)))
 
-    #@timing
+    @timing
     @check_database('geo-opt')
     def geo_opt_force(self, beam, beam_pos, force_dir, force_type='total'):
         """ Force that beam causes in a spherical particle in a deter-
