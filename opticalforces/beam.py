@@ -29,14 +29,28 @@ import scipy.special as ss
 from scipy.integrate import quad
 import numpy as np
 
+def derivative(func, x0):
+    # Delta
+    h = 1e-9
+
+    # Denominator coefficient
+    den = 840*h
+
+    # Locations of Sampled Points
+    lsp = [-4, -3, -2, -1, 0, 1, 2, 3, 4]
+
+    # Finite Difference Coefficients
+    fdc = [3, -32, 168, -672, 0, 672, -168, 32, -3]
+
+    return np.dot(fdc, [func(x0+i*h) for i in lsp])/den
+
 
 class Beam(object):
-    """ This class has all properties and methods that a specific beam
-    should have.
+    """ This class has all properties and methods that a specific scalar
+    beam should have.
 
     """
-    generic_params = ('_electric_field_direction',
-                      '_vacuum_wavelength',
+    generic_params = ('_vacuum_wavelength',
                       '_vacuum_wavenumber',
                       '_medium_refractive_index',
                       '_wavelength',
@@ -49,12 +63,11 @@ class Beam(object):
 
     params = amp_pha_params + generic_params + intrinsic_params
 
-    def __init__(self, beams, name='generic-beam'):
+    def __init__(self, beams, name='generic-scalar-beam'):
         self.beams = beams
         self.name = name
 
         if isinstance(beams, list) is True:
-            self._electric_field_direction = beams[0].electric_field_direction
             self._vacuum_wavelength = beams[0].vacuum_wavelength
             self._vacuum_wavenumber = beams[0].vacuum_wavenumber
             self._medium_refractive_index = beams[0].medium_refractive_index
@@ -67,7 +80,6 @@ class Beam(object):
             self._wavelength = None
             self._wavenumber = None
 
-        self._electric_field_direction = [1, 0, 0]
         self._amplitude = 1
         self._phase = 0
 
@@ -104,20 +116,16 @@ class Beam(object):
             raise NameError('Beams with differents wavelength')
         if self.vacuum_wavelength != other.vacuum_wavelength:
             raise NameError('Beams with differents vacuum_wavelength')
-        # effetuate the sum because all generic params is equal.
+
+        # effetuate the sum because all generic params are equal.
         beams = []
+
         for beam in self.beams:
-            _beam = copy.copy(beam)
-            _beam.amplitude *= self.amplitude
-            _beam.phase += self.phase
-            beams.append(_beam)
+            beams.append(copy.copy(beam))
 
         for beam in other.beams:
-            _beam = copy.copy(beam)
-            _beam.amplitude *= other.amplitude
-            _beam.phase += other.phase
-            beams.append(_beam)
-        #beams = list(self.beams) + list(other.beams)
+            beams.append(copy.copy(beam))
+
         return Beam(beams)
 
     @property
@@ -135,15 +143,6 @@ class Beam(object):
     @phase.setter
     def phase(self, value):
         self._phase = value
-
-    @property
-    def electric_field_direction(self):
-        return self._electric_field_direction
-
-    @electric_field_direction.setter
-    def electric_field_direction(self, vector):
-        self._electric_field_direction = [v/np.linalg.norm(vector)
-                                          for v in vector]
 
     # ----- vacuum -----
 
@@ -258,24 +257,23 @@ class Beam(object):
                 return False
         return True
 
-    def psi(self, point):
+    def psi(self, x1, x2, x3, system='cartesian'):
         return (self._amplitude*cm.exp(1j*self._phase)
-                *sum([beam.psi(point) for beam in self.beams]))
+                *sum([beam.psi(x1, x2, x3, system)
+                     for beam in self.beams]))
 
-    def intensity(self, point):
+    def intensity(self, x1, x2, x3, system='cartesian'):
         """ Wave's intensity.
 
         Args:
-            point (:obj:'Point'): point at which want to calculate
-                wave's intensity, that is psi's abs squared.
 
         Returns:
             Wave's intensity.
 
         """
-        return abs(self.psi(point))**2
+        return abs(self.psi(x1, x2, x3, system))**2
 
-    def wavenumber_direction(self, point):
+    def wavenumber_direction(self, x1, x2, x3, system='cartesian'):
         """ k0 vector's direction.
 
         k0 vector's direction is defined by gradient of phase function.
@@ -291,55 +289,34 @@ class Beam(object):
             A list containing the normalized k0 vector - [kx, ky, kz]
         """
 
-        # Delta
-        h = 1e-15
-
-        # Denominator coefficient
-        den = 840*h
-
-        # Locations of Sampled Points
-        lsp = [-4, -3, -2, -1, 0, 1, 2, 3, 4]
-
-        # Finite Difference Coefficients
-        fdc = [3, -32, 168, -672, 0, 672, -168, 32, -3]
-
-        # Psi calculated over samples points
-        psix = [self.psi(Point([point.x+i*h, point.y, point.z])) for i in lsp]
-        psiy = [self.psi(Point([point.x, point.y+i*h, point.z])) for i in lsp]
-        psiz = [self.psi(Point([point.x, point.y, point.z+i*h])) for i in lsp]
-
-        # Psi derivative
-        psi_x = np.dot(fdc, psix)/den
-        psi_y = np.dot(fdc, psiy)/den
-        psi_z = np.dot(fdc, psiz)/den
-
         # k0 components
-        psi = self.psi(point)
-        k0x = (psi_x/psi).imag
-        k0y = (psi_y/psi).imag
-        k0z = (psi_z/psi).imag
+        (x0, y0, z0) = Point(x1, x2, x3).cartesian()
+        psi = self.psi(x0, y0, z0, system)
+        k0x = (derivative(lambda x: self.psi(x, y0, z0, system), x0)/psi).imag
+        k0y = (derivative(lambda y: self.psi(x0, y, z0, system), y0)/psi).imag
+        k0z = (derivative(lambda z: self.psi(x0, y0, z, system), z0)/psi).imag
 
         if (ma.isinf(k0x) is True
                 or ma.isinf(k0y) is True
                 or ma.isinf(k0z) is True):
-            return [0, 0, 0]
+            return (0, 0, 0)
 
         if (ma.isnan(k0x) is True
                 or ma.isnan(k0y) is True
                 or ma.isnan(k0z) is True):
-            return [0, 0, 0]
+            return (0, 0, 0)
 
         # normalize k0 vector
         if k0x != 0 or k0y != 0 or k0z != 0:
             k = [k0x, k0y, k0z]
-            return [k0x/np.linalg.norm(k),
+            return (k0x/np.linalg.norm(k),
                     k0y/np.linalg.norm(k),
-                    k0z/np.linalg.norm(k)]
+                    k0z/np.linalg.norm(k))
         else:
-            return [0, 0, 1]
+            return (0, 0, 0)
 
 
-class PlaneWave(Beam):
+class ScalarPlaneWave(Beam):
     intrinsic_params = ()
 
     params = Beam.params + intrinsic_params
@@ -349,29 +326,28 @@ class PlaneWave(Beam):
 
         self.beams = [self]
 
-        self.name = 'plane-wave'
+        self.name = 'scalar-plane-wave'
 
         for key, value in kwargs.items():
             if hasattr(self, '_' + key):
                 setattr(self, key, value)
 
-    def psi(self, point):
+    def psi(self, x1, x2, x3, system='cartesian'):
         """ Wave's equation 'psi'.
 
         Args:
-            point (:obj:'Point'): point at which want to calculate
-                'psi' value.
 
         Returns:
             Wave's equation complex value of default plane wave decla-
                 red on beam class.
 
         """
+        point = Point(x1, x2, x3, system)
         return (self._amplitude*cm.exp(1j*self._phase)
                 *cm.exp(1j*self._wavenumber*point.z))
 
 
-class BesselBeam(Beam):
+class ScalarBesselBeam(Beam):
     intrinsic_params = ('_longitudinal_wavenumber',
                         '_transversal_wavenumber',
                         '_axicon_angle',
@@ -385,7 +361,7 @@ class BesselBeam(Beam):
 
         self.beams = [self]
 
-        self.name = 'bessel-beam'
+        self.name = 'scalar-bessel-beam'
 
         self._transversal_wavenumber = None
         self._longitudinal_wavenumber = None
@@ -523,7 +499,10 @@ class BesselBeam(Beam):
     def bessel_order(self, value):
         self._bessel_order = value
 
-    def psi(self, point):
+    def psi(self, x1, x2, x3, system='cartesian'):
+        point = Point(x1, x2, x3, system)
+        print(self._longitudinal_wavenumber*point.z)
+        #print(self._bessel_order)
         return (self._amplitude*cm.exp(1j*self._phase)
                 *ss.jv(self._bessel_order,
                        self._transversal_wavenumber*point.rho)
@@ -531,7 +510,7 @@ class BesselBeam(Beam):
                 * cm.exp(1j*self._bessel_order*point.phi))
 
 
-class GaussianBeam(Beam):
+class ScalarGaussianBeam(Beam):
     intrinsic_params = ('_q',
                         '_gaussian_spot',
                         '_rayleigh_range',)
@@ -543,7 +522,7 @@ class GaussianBeam(Beam):
 
         self.beams = [self]
 
-        self.name = 'gaussian-beam'
+        self.name = 'scalar-gaussian-beam'
 
         self._q = None
         self._gaussian_spot = None
@@ -593,71 +572,57 @@ class GaussianBeam(Beam):
         self._rayleigh_range = value
         self.gaussian_spot = ma.sqrt(value*self._wavelength/pi)
 
-    def waist_radius(self, point):
+    def waist_radius(self, x1, x2, x3, system='cartesian'):
+        point = Point(x1, x2, x3, system)
         if self.rayleigh_range == 0:
             return ma.inf
         return self._gaussian_spot*ma.sqrt(1+(point.z/self.rayleigh_range)**2)
 
-    def fwhm(self, point):
+    def fwhm(self, x1, x2, x3, system='cartesian'):
+        point = Point(x1, x2, x3, system)
         return self.waist_radius(point)*ma.sqrt(2*ma.log(2))
 
-    def curvature_radius(self, point):
+    def curvature_radius(self, x1, x2, x3, system='cartesian'):
+        point = Point(x1, x2, x3, system)
         if point.z == 0:
             return ma.inf
         return point.z*(1+(self.rayleigh_range/point.z)**2)
 
-    def gouy_phase(self, point):
+    def gouy_phase(self, x1, x2, x3, system='cartesian'):
+        point = Point(x1, x2, x3, system)
         if self.rayleigh_range == 0:
             return pi
         return ma.atan(point.z/self.rayleigh_range)
 
-    def psi(self, point):
+    def psi(self, x1, x2, x3, system='cartesian'):
+        point = Point(x1, x2, x3, system)
         k = self._wavenumber
         q = self._q
         return (self._amplitude*cm.exp(1j*self._phase)
                 * (1/(1+1j*point.z*2*q/k))*cm.exp(1j*point.z*k)
                 * cm.exp((-q*point.rho**2)/(1+1j*point.z*2*q/k)))
 
-    def wavenumber_direction(self, point):
-        wavelength = self._wavelength
-        gaussian_spot = self._gaussian_spot
-        wavenumber = self._wavenumber
-        curvature_radius = self.curvature_radius(point)
 
-        if ma.isinf(curvature_radius):
-            return [0, 0, 1]
-
-        k0x = point.x/curvature_radius
-        k0y = point.y/curvature_radius
-        k0z = ((1-(2/(wavenumber*gaussian_spot)**2)
-                * (1/(1+((point.z*wavelength)/(pi*gaussian_spot**2))**2))
-                - (point.rho**2)/(2*curvature_radius**2)
-                * (1-(pi*gaussian_spot**2/(wavelength*point.z))**2)))
-
-        k0 = [k0x, k0y, k0z]
-
-        return k0/np.linalg.norm(k0)
-
-
-class BesselGaussBeam(BesselBeam, GaussianBeam):
-    intrinsic_params = BesselBeam.intrinsic_params
-    intrinsic_params += GaussianBeam.intrinsic_params
+class ScalarBesselGaussBeam(ScalarBesselBeam, ScalarGaussianBeam):
+    intrinsic_params = ScalarBesselBeam.intrinsic_params
+    intrinsic_params += ScalarGaussianBeam.intrinsic_params
 
     params = Beam.params + intrinsic_params
 
     def __init__(self, **kwargs):
-        BesselBeam.__init__(self)
-        GaussianBeam.__init__(self)
+        ScalarBesselBeam.__init__(self)
+        ScalarGaussianBeam.__init__(self)
 
         self.beams = [self]
 
-        self.name = 'bessel-gauss-beam'
+        self.name = 'scalar-bessel-gauss-beam'
 
         for key, value in kwargs.items():
             if hasattr(self, '_' + key):
                 setattr(self, key, value)
 
-    def psi(self, point):
+    def psi(self, x1, x2, x3, system='cartesian'):
+        point = Point(x1, x2, x3, system)
         q = self._q
         k = self._wavenumber
         krho = self._transversal_wavenumber
@@ -677,8 +642,8 @@ class BesselGaussBeam(BesselBeam, GaussianBeam):
         return self._amplitude*cm.exp(1j*self._phase)*value
 
 
-class BesselGaussBeamSuperposition(BesselGaussBeam):
-    intrinsic_params = BesselGaussBeam.intrinsic_params
+class ScalarBesselGaussBeamSuperposition(ScalarBesselGaussBeam):
+    intrinsic_params = ScalarBesselGaussBeam.intrinsic_params
 
     intrinsic_params += ('_N',
                          '_zmax',
@@ -689,11 +654,11 @@ class BesselGaussBeamSuperposition(BesselGaussBeam):
     params = Beam.params + intrinsic_params
 
     def __init__(self, **kwargs):
-        BesselGaussBeam.__init__(self)
+        ScalarBesselGaussBeam.__init__(self)
 
         self.beams = [self]
 
-        self.name = 'bessel-gauss-beam-superposition'
+        self.name = 'scalar-bessel-gauss-beam-superposition'
 
         self._N = None
         self._zmax = None
@@ -827,7 +792,7 @@ class BesselGaussBeamSuperposition(BesselGaussBeam):
 
         for i in range(2*self.N + 1):
             n_index = i - self.N
-            beam = BesselGaussBeam()
+            beam = ScalarBesselGaussBeam()
             beam.amplitude = amplitude_n(n_index)
             beam.wavelength = self.wavelength
             beam.medium_refractive_index = self.medium_refractive_index
@@ -835,31 +800,34 @@ class BesselGaussBeamSuperposition(BesselGaussBeam):
             beam.q = (self.qr - 1j*2*pi*n_index/self.L)
             self.beams.append(beam)
 
-    def psi(self, point):
+    def psi(self, x1, x2, x3, system='cartesian'):
         return (self._amplitude*cm.exp(1j*self._phase)
-                *sum([beam.psi(point) for beam in self.beams]))
+                *sum([beam.psi(x1, x2, x3, system) for beam in self.beams]))
 
 
-class FrozenWave(Beam):
+class ScalarFrozenWave(Beam):
     intrinsic_params = ('_Q',
                         '_N',
                         '_L',
-                        '_func',)
+                        '_bessel_order',
+                        '_reference_function',)
 
     params = Beam.params + intrinsic_params
 
     def __init__(self, **kwargs):
         Beam.__init__(self, self)
 
-        self.name = 'frozen-wave'
+        self.name = 'scalar-frozen-wave'
 
         self.beams = [self]
 
         self._Q = None
         self._N = None
         self._L = None
-        self._func = None
-        self.func = None
+        self._bessel_order = 0
+        self._reference_function = None  # string
+        self.func = None  # function
+        self.amplitudes = []
 
         for key, value in kwargs.items():
             if hasattr(self, '_' + key):
@@ -895,13 +863,21 @@ class FrozenWave(Beam):
         self.__create_superposition()
 
     @property
+    def bessel_order(self):
+        return self._bessel_order
+
+    @bessel_order.setter
+    def bessel_order(self, value):
+        self._bessel_order = value
+
+    @property
     def reference_function(self):
         return self.func
 
     @reference_function.setter
     def reference_function(self, func):
         self.func = func
-        self._func = "Already defined"
+        self._reference_function = 'Already defined (name: %s)' % func.__name__
         self.__create_superposition()
 
     def __create_superposition(self):
@@ -938,33 +914,166 @@ class FrozenWave(Beam):
         self.beams = []
         for i in range(2*self.N + 1):
             n_index = i - self.N
-            beam = BesselBeam()
+            beam = ScalarBesselBeam()
             beam.amplitude = amplitude_n(n_index)
             beam.wavelength = self.wavelength
             beam.medium_refractive_index = self.medium_refractive_index
             beam.longitudinal_wavenumber = self.Q + 2*pi*n_index/self.L
+            beam.bessel_order = self.bessel_order
             self.beams.append(beam)
+            self.amplitudes.append(amplitude_n(n_index))
 
-    def psi(self, point):
+    def psi(self, x1, x2, x3, system='cartesian'):
         return (self._amplitude*cm.exp(1j*self._phase)
-                *sum([beam.psi(point) for beam in self.beams]))
+                *sum([beam.psi(x1, x2, x3, system) for beam in self.beams]))
 
+
+class VectorialBeam(Beam):
+    intrinsic_params = ()
+
+    params = Beam.params + intrinsic_params
+
+    def __init__(self, **kwargs):
+        Beam.__init__(self, self)
+
+        self.beams = [self]
+
+        self.name = 'generic-vectorial-beam'
+
+        for key, value in kwargs.items():
+            if hasattr(self, '_' + key):
+                setattr(self, key, value)
+
+    def Ex(self, x1, x2, x3, system='cartesian'):
+        return 1
+
+    def Ey(self, x1, x2, x3, system='cartesian'):
+        return 0
+
+    def Ez(self, x1, x2, x3, system='cartesian'):
+        return 0
+
+    def E(self, x1, x2, x3, system='cartesian'):
+        return (self.Ex(x1, x2, x3, system),
+                self.Ey(x1, x2, x3, system),
+                self.Ez(x1, x2, x3, system),)
+
+    def electric_field(self, x1, x2, x3, system='cartesian'):
+        return self.E(x1, x2, x3, system)
+
+    def intensity(self, x1, x2, x3, system='cartesian'):
+        return np.linalg.norm(self.E(x1, x2, x3, system))
+
+    def electric_field_direction(self, x1, x2, x3, system='cartesian'):
+        E0 = self.E(x1, x2, x3, system)
+        E0_abs = np.linalg.norm(E0)
+        return [E/E0_abs for E in E0]
+
+    def Hx(self, x1, x2, x3, system='cartesian'):
+        return 0
+
+    def Hy(self, x1, x2, x3, system='cartesian'):
+        return 1
+
+    def Hz(self, x1, x2, x3, system='cartesian'):
+        return 0
+
+    def H(self, x1, x2, x3, system='cartesian'):
+        return (self.Hx(x1, x2, x3, system),
+                self.Hy(x1, x2, x3, system),
+                self.Hz(x1, x2, x3, system),)
+
+    def wavenumber_direction(self, x1, x2, x3, system='cartesian'):
+        print('asd')
+        wdir = np.cross(self.E(x1, x2, x3, system), self.H(x1, x2, x3, system))
+        wdir_abs = np.linalg.norm(wdir)
+        return [k/wdir_abs for k in wdir]
+
+
+class VectorialBesselBeam(ScalarBesselBeam, VectorialBeam):
+    intrinsic_params = ScalarBesselBeam.intrinsic_params
+    intrinsic_params += VectorialBeam.intrinsic_params
+
+    params = Beam.params + intrinsic_params
+
+    def __init__(self, **kwargs):
+        ScalarBesselBeam.__init__(self)
+        VectorialBeam.__init__(self)
+
+        self.beams = [self]
+
+        self.name = 'vectorial-bessel-beam'
+
+        for key, value in kwargs.items():
+            if hasattr(self, '_' + key):
+                setattr(self, key, value)
+
+    #def wavenumber_direction(self, x1, x2, x3, system='cartesian'):
+    #    return super(ScalarBesselBeam, self).wavenumber_direction(x1, x2, x3, system)
+
+    def Ex(self, x1, x2, x3, system='cartesian'):
+        point = Point(x1, x2, x3, system)
+        z = point.z
+        phi = point.phi
+        rho = point.rho
+        krho = self._longitudinal_wavenumber
+        kz = self._transversal_wavenumber
+        ni = self._bessel_order
+        alpha = self._axicon_angle
+        return (0.25*(1+ma.cos(alpha))*(-1j)**ni*cm.exp(-1j*kz*z)
+                *(+(1+ma.cos(alpha))*ss.jv(ni, krho*rho)
+                  +0.5*(1-ma.cos(alpha))*(+cm.exp(+2j*phi)*ss.jv(ni+2, krho*rho)
+                                          +cm.exp(-2j*phi)*ss.jv(ni-2, krho*rho)
+                                         )
+                 )
+               )
+
+    def Ey(self, x1, x2, x3, system='cartesian'):
+        point = Point(x1, x2, x3, system)
+        z = point.z
+        phi = point.phi
+        rho = point.rho
+        krho = self._longitudinal_wavenumber
+        kz = self._transversal_wavenumber
+        ni = self._bessel_order
+        alpha = self._axicon_angle
+        #return 0
+        return (0.25*(1+ma.cos(alpha))*(-1j)**ni*cm.exp(-1j*kz*z)
+                *(-0.5j*(1-ma.cos(alpha))*(+cm.exp(+2j*phi)*ss.jv(ni+2, krho*rho)
+                                           -cm.exp(-2j*phi)*ss.jv(ni-2, krho*rho)
+                                          )
+                 )
+               )
+
+    def Ez(self, x1, x2, x3, system='cartesian'):
+        point = Point(x1, x2, x3, system)
+        z = point.z
+        phi = point.phi
+        rho = point.rho
+        krho = self._longitudinal_wavenumber
+        kz = self._transversal_wavenumber
+        ni = self._bessel_order
+        alpha = self._axicon_angle
+        #return 0
+        return (0.25*(1+ma.cos(alpha))*(-1j)**ni*cm.exp(-1j*kz*z)
+                *(+1j*ma.sin(alpha)*(+cm.exp(+1j*phi)*ss.jv(ni+1, krho*rho)
+                                     -cm.exp(-1j*phi)*ss.jv(ni-1, krho*rho)
+                                    )
+                 )
+               )
 
 class Point(object):
-    def __init__(self, vector, system='cartesian'):
-        v1 = vector[0]
-        v2 = vector[1]
-        v3 = vector[2]
+    def __init__(self, x1, x2, x3, system='cartesian'):
         if system == 'cartesian':
-            self.__init(v1, v2, v3)
+            self.__init(x1, x2, x3)
 
         elif system == 'cylindrical':
-            self.__init(v1*ma.cos(v2), v1*ma.sin(v2), v3)
+            self.__init(x1*ma.cos(x2), x1*ma.sin(x2), x3)
 
         elif system == 'spherical':
-            self.__init(v1*ma.sin(v2)*ma.cos(v3),
-                        v1*ma.sin(v2)*ma.sin(v3),
-                        v1*ma.cos(v2))
+            self.__init(x1*ma.sin(x2)*ma.cos(x3),
+                        x1*ma.sin(x2)*ma.sin(x3),
+                        x1*ma.cos(x2))
 
         else:
             raise NameError('System not defined. Choose amoung '
@@ -1041,3 +1150,99 @@ class Point(object):
 
 if __name__ == "__main__":
     print("Please, visit: https://github.com/arantespp/opticalforces")
+
+    vbb = VectorialBesselBeam()
+    vbb.wavelength = 1064e-9
+    vbb.medium_refractive_index = 1.33
+    vbb.amplitude = 5
+    vbb.axicon_angle_degree = 10
+    vbb.bessel_order = 3
+
+    #print(vbb)
+    print(vbb.intensity(0.0003,0.0008,0.01))
+
+    '''vb = VectorialBeam()
+
+    b = ScalarPlaneWave()
+    b.wavelength = 1064e-9
+    b.medium_refractive_index = 1.33
+    b.amplitude = 5
+
+    vb.Ex = b.psi
+
+
+    print(b.psi(1.1, 0, 1.1))
+    print(vb.electric_field(1.1, 0, 1.1))'''
+
+    '''b = ScalarPlaneWave()
+    b.wavelength = 1064e-9
+    b.medium_refractive_index = 1.33
+    b.amplitude = 5
+
+    b2 = ScalarPlaneWave()
+    b2.wavelength = 1064e-9
+    b2.medium_refractive_index = 1.33
+    b2.phase = 3
+
+    bb = ScalarBesselBeam()
+    bb.wavelength = 1064e-9
+    bb.medium_refractive_index = 1.33
+    bb.phase = 1
+    bb.axicon_angle_degree = 10
+
+    bg = ScalarGaussianBeam()
+    bg.wavelength = 1064e-9
+    bg.medium_refractive_index = 1.33
+    bg.amplitude = 4
+    bg.phase = pi/10
+    bg.q = 2
+
+    bgb = ScalarBesselGaussBeam()
+    bgb.wavelength = 1064e-9
+    bgb.medium_refractive_index = 1.33
+    bgb.axicon_angle_degree = 10
+    bgb.amplitude = 3.1
+    bgb.phase = pi/7
+    bgb.q = 2
+
+    bgbs = ScalarBesselGaussBeamSuperposition()
+    bgbs.wavelength = 1064e-9
+    bgbs.medium_refractive_index = 1.33
+    bgbs.axicon_angle_degree = 10
+    bgbs.amplitude = 3.5
+    bgbs.phase = pi/4
+    bgbs.q = 0.01
+    bgbs.N = 4
+    bgbs.aperture_radius = 1e-3
+
+    def ref_func(z):
+        if abs(z) < 0.35*0.1:
+            return ss.jv(0, 500*z)
+        else:
+            return 0
+
+    fw = ScalarFrozenWave()
+    fw.wavelength = 1064e-9
+    fw.medium_refractive_index = 1.33
+    fw.amplitude = 3.5
+    fw.Q = 0.99*fw.wavenumber
+    fw.N = 3
+    fw.L = 0.1
+    fw.bessel_order = 1
+    print(fw)
+    fw.reference_function = ref_func
+
+    print(fw.psi(0.002*0,0,0.003*0))
+
+    c = b + b2 + bb + bg + bgb + bgbs + fw
+    #c = fw
+    c.amplitude = 3
+    print(c)
+    print(c.psi(0, 0, 0.001))
+    print(c.psi(0.01, pi, 0.01, 'cylindrical'))
+    print(c.psi(0.01, pi, 0.01, 'spherical'))
+    print(c.wavenumber_direction(0.0001, pi, 0.02, 'spherical'))
+    print(c.wavenumber_direction(0.0001, pi, 0.02, 'cylindrical'))
+    '''
+    #a = (ref_func, 2)
+    #print(a)
