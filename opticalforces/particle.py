@@ -201,8 +201,10 @@ class SphericalParticle(object):
         if incident_angle == 0:
             nrel = (self._refractive_index/self._medium_refractive_index)
             return (n-1)/(n+1)
+
         if refracted_angle == pi/2:
             return 1
+
         return (ma.tan(incident_angle - refracted_angle)
                 / ma.tan(incident_angle + refracted_angle))**2
 
@@ -211,8 +213,10 @@ class SphericalParticle(object):
         if incident_angle == 0:
             nrel = (self._refractive_index/self._medium_refractive_index)
             return -(n-1)/(n+1)
+
         if refracted_angle == pi/2:
             return 1
+
         return (ma.sin(incident_angle - refracted_angle)
                 / ma.sin(incident_angle + refracted_angle))**2
 
@@ -273,15 +277,16 @@ class SphericalParticle(object):
         (2008): 085001.
 
         """
-        E0 = beam.electric_field_direction
 
         def dforce(theta, phi):
             # Beam particle surface: beam coordinates point that
             # match the point at theta and phi on particle surface.
-            bps = Point([self.radius, theta, phi], 'spherical') - beam_pos
+            bps = Point(self.radius, theta, phi, 'spherical') - beam_pos
+
+            rho, phi, z = bps.cylindrical()
 
             # Vector parallel to the direction of a single ray.
-            k0 = beam.wavenumber_direction(bps)
+            k0 = beam.wavenumber_direction(rho, phi, z, 'cylindrical')
 
             n0 = self.normal(theta, phi)
 
@@ -297,16 +302,17 @@ class SphericalParticle(object):
 
             d0 = self.ortonormal_ray_direction(k0, n0)
 
+            E0 = beam.electric_field_direction(rho, phi, z, 'cylindrical')
+
             beta = self.crossing_angle(k0, n0, E0)
 
             reflectivity = self.reflectivity(thetai, thetar, beta)
 
             trasmissivity = self.trasmissivity(thetai, thetar, beta)
 
-            Qt = self.Qt(thetai, thetar, reflectivity, trasmissivity,
-                         force_type)
+            Qt = self.Qt(thetai, thetar, reflectivity, trasmissivity, force_type)
 
-            intensity = beam.intensity(bps)
+            intensity = beam.intensity(rho, phi, z, 'cylindrical')
 
             dpower = intensity*ma.cos(thetai)
 
@@ -344,26 +350,21 @@ class SphericalParticle(object):
 if __name__ == '__main__':
     print("Please, visit: https://github.com/arantespp/opticalforces")
 
-    from beam import FrozenWave, Point
-
-    # ----- beam definition -----
-
-    L=1e-3
-
-    fw = FrozenWave(vacuum_wavelength=1064e-9,
-                    medium_refractive_index=1.33,
-                    L=L,
-                    N=2)
-
-    fw.Q = 0.95*fw.wavenumber
+    from beam import VectorialFrozenWave, Point
 
     def ref_func(z):
-        if abs(z) < 0.1*L:
+        if abs(z) < 0.35*0.1:
             return 1
         else:
             return 0
 
-    fw.reference_function = ref_func
+    vfw = VectorialFrozenWave()
+    vfw.wavelength = 1064e-9
+    vfw.medium_refractive_index = 1.33
+    vfw.Q = 0.99*vfw.wavenumber
+    vfw.N = 5
+    vfw.L = 0.1
+    vfw.reference_function = ref_func
 
     # ----- particle definition
     ptc = SphericalParticle()
@@ -371,4 +372,4 @@ if __name__ == '__main__':
     ptc.medium_refractive_index = 1.33
     ptc.refractive_index = 1.6
 
-    print(ptc.geo_opt_force(fw, Point([0,0,0.01]), 'fz', 'total'))
+    print(ptc.geo_opt_force(vfw, Point(0,0,0.01), 'fz', 'total'))

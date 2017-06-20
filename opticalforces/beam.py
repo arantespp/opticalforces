@@ -29,6 +29,10 @@ import scipy.special as ss
 from scipy.integrate import quad
 import numpy as np
 
+# Speed of light.
+SPEED_OF_LIGHT = 299792458
+VACUUM_PERMEABILITY = pi*4e-7
+
 def derivative(func, x0):
     # Delta
     h = 1e-9
@@ -85,29 +89,36 @@ class Beam(object):
 
     def __str__(self):
         out = 'name: ' + self.name + '\n'
+
         # print amplitude and phase
         for param in self.amp_pha_params:
             out += '    ' + param + ': ' + str(self.__dict__[param])
             out += '\n'
+
         # print generic params
         for param in self.generic_params:
             out += '    ' + param + ': ' + str(self.__dict__[param])
             out += '\n'
+
         for param in self.intrinsic_params:
             out += '    ' + param + ': ' + str(self.__dict__[param])
             out += '\n'
+
         if len(self.beams) > 1:
             # print beams
             for i, beam in enumerate(self.beams):
                 out += '\n' + 'beam %d (%d)' %(i+1, i-len(self.beams)//2)
                 out += ': %s' %beam.name
                 out += '\n'
+
                 for param in beam.amp_pha_params:
                     out += '    ' + param + ': ' + str(beam.__dict__[param])
                     out += '\n'
+
                 for param in beam.intrinsic_params:
                     out += '    ' + param + ': ' + str(beam.__dict__[param])
                     out += '\n'
+
         return out
 
     def __add__(self, other):
@@ -121,9 +132,13 @@ class Beam(object):
         beams = []
 
         for beam in self.beams:
+            beam._amplitude *= self._amplitude
+            beam._phase += self._phase
             beams.append(copy.copy(beam))
 
         for beam in other.beams:
+            beam._amplitude *= other._amplitude
+            beam._phase += other._phase
             beams.append(copy.copy(beam))
 
         return Beam(beams)
@@ -251,7 +266,7 @@ class Beam(object):
                 and self.wavenumber is None):
             self.wavenumber = self.vacuum_wavenumber*nm
 
-    def is_all_parameters_defined(self):
+    def is_all_params_defined(self):
         for param, value in self.__dict__.items():
             if value is None and param[0] == '_':
                 return False
@@ -325,7 +340,6 @@ class ScalarPlaneWave(Beam):
         Beam.__init__(self, self)
 
         self.beams = [self]
-
         self.name = 'scalar-plane-wave'
 
         for key, value in kwargs.items():
@@ -342,9 +356,13 @@ class ScalarPlaneWave(Beam):
                 red on beam class.
 
         """
-        point = Point(x1, x2, x3, system)
+        if system == 'cartesian' or system == 'cylindrical':
+            z = x3
+        else:
+            z = Point(x1, x2, x3, system).z
+
         return (self._amplitude*cm.exp(1j*self._phase)
-                *cm.exp(1j*self._wavenumber*point.z))
+                *cm.exp(1j*self._wavenumber*z))
 
 
 class ScalarBesselBeam(Beam):
@@ -360,7 +378,6 @@ class ScalarBesselBeam(Beam):
         Beam.__init__(self, self)
 
         self.beams = [self]
-
         self.name = 'scalar-bessel-beam'
 
         self._transversal_wavenumber = None
@@ -500,14 +517,16 @@ class ScalarBesselBeam(Beam):
         self._bessel_order = value
 
     def psi(self, x1, x2, x3, system='cartesian'):
-        point = Point(x1, x2, x3, system)
-        print(self._longitudinal_wavenumber*point.z)
-        #print(self._bessel_order)
+        if system == 'cylindrical':
+            rho, phi, z = x1, x2, x3
+        else:
+            rho, phi, z = Point(x1, x2, x3, system).cylindrical()
+
         return (self._amplitude*cm.exp(1j*self._phase)
                 *ss.jv(self._bessel_order,
-                       self._transversal_wavenumber*point.rho)
-                * cm.exp(1j*self._longitudinal_wavenumber*point.z)
-                * cm.exp(1j*self._bessel_order*point.phi))
+                       self._transversal_wavenumber*rho)
+                * cm.exp(1j*self._longitudinal_wavenumber*z)
+                * cm.exp(1j*self._bessel_order*phi))
 
 
 class ScalarGaussianBeam(Beam):
@@ -521,7 +540,6 @@ class ScalarGaussianBeam(Beam):
         Beam.__init__(self, self)
 
         self.beams = [self]
-
         self.name = 'scalar-gaussian-beam'
 
         self._q = None
@@ -554,8 +572,10 @@ class ScalarGaussianBeam(Beam):
     def gaussian_spot(self, value):
         self._gaussian_spot = value
         self._rayleigh_range = pi*value**2/self._wavelength
+
         if self._q is not None:
             return
+
         if value == 0:
             self._q = ma.inf
         elif ma.isinf(value):
@@ -595,18 +615,20 @@ class ScalarGaussianBeam(Beam):
         return ma.atan(point.z/self.rayleigh_range)
 
     def psi(self, x1, x2, x3, system='cartesian'):
-        point = Point(x1, x2, x3, system)
+        if system == 'cylindrical':
+            rho, phi, z = x1, x2, x3
+        else:
+            rho, phi, z = Point(x1, x2, x3, system).cylindrical()
         k = self._wavenumber
         q = self._q
         return (self._amplitude*cm.exp(1j*self._phase)
-                * (1/(1+1j*point.z*2*q/k))*cm.exp(1j*point.z*k)
-                * cm.exp((-q*point.rho**2)/(1+1j*point.z*2*q/k)))
+                * (1/(1+1j*z*2*q/k))*cm.exp(1j*z*k)
+                * cm.exp((-q*rho**2)/(1+1j*z*2*q/k)))
 
 
 class ScalarBesselGaussBeam(ScalarBesselBeam, ScalarGaussianBeam):
     intrinsic_params = ScalarBesselBeam.intrinsic_params
     intrinsic_params += ScalarGaussianBeam.intrinsic_params
-
     params = Beam.params + intrinsic_params
 
     def __init__(self, **kwargs):
@@ -614,7 +636,6 @@ class ScalarBesselGaussBeam(ScalarBesselBeam, ScalarGaussianBeam):
         ScalarGaussianBeam.__init__(self)
 
         self.beams = [self]
-
         self.name = 'scalar-bessel-gauss-beam'
 
         for key, value in kwargs.items():
@@ -622,22 +643,26 @@ class ScalarBesselGaussBeam(ScalarBesselBeam, ScalarGaussianBeam):
                 setattr(self, key, value)
 
     def psi(self, x1, x2, x3, system='cartesian'):
-        point = Point(x1, x2, x3, system)
+        if system == 'cylindrical':
+            rho, phi, z = x1, x2, x3
+        else:
+            rho, phi, z = Point(x1, x2, x3, system).cylindrical()
+
         q = self._q
         k = self._wavenumber
         krho = self._transversal_wavenumber
 
-        if point.z != 0:
-            Q = q - 1j*k/(2*point.z)
-            num = 1j*k/(2*point.z*Q)
-            exp1 = cm.exp(1j*k*(point.z+point.rho**2/(2*point.z)))
-            bessel = ss.jv(0, num*krho*point.rho)
-            exp2 = cm.exp(-(krho**2 + k**2*point.rho**2/point.z**2)/(4*Q))
+        if z != 0:
+            Q = q - 1j*k/(2*z)
+            num = 1j*k/(2*z*Q)
+            exp1 = cm.exp(1j*k*(z+rho**2/(2*z)))
+            bessel = ss.jv(0, num*krho*rho)
+            exp2 = cm.exp(-(krho**2 + k**2*rho**2/z**2)/(4*Q))
             if ma.isinf(bessel.real) is True:
-                value = ss.jv(0, krho*point.rho)*cm.exp(-q*point.rho**2)
+                value = ss.jv(0, krho*rho)*cm.exp(-q*rho**2)
             value = -num*exp1*bessel*exp2
         else:
-            value = ss.jv(0, krho*point.rho)*cm.exp(-q*point.rho**2)
+            value = ss.jv(0, krho*rho)*cm.exp(-q*rho**2)
 
         return self._amplitude*cm.exp(1j*self._phase)*value
 
@@ -657,7 +682,6 @@ class ScalarBesselGaussBeamSuperposition(ScalarBesselGaussBeam):
         ScalarBesselGaussBeam.__init__(self)
 
         self.beams = [self]
-
         self.name = 'scalar-bessel-gauss-beam-superposition'
 
         self._N = None
@@ -679,12 +703,14 @@ class ScalarBesselGaussBeamSuperposition(ScalarBesselGaussBeam):
     @q.setter
     def q(self, value):
         self._q = value
+
         if value == 0:
             self.gaussian_spot = ma.inf
         elif cm.isinf(value):
             self.gaussian_spot = 0
         else:
             self.gaussian_spot = ma.sqrt(1/value.real)
+
         self.__create_superposition()
 
     @property
@@ -703,9 +729,11 @@ class ScalarBesselGaussBeamSuperposition(ScalarBesselGaussBeam):
     @zmax.setter
     def zmax(self, value):
         self._zmax = value
+
         if (self.axicon_angle is None
                 and self.aperture_radius is not None):
             self.axicon_angle = ma.atan(self.aperture_radius/self.zmax)
+
         if (self.axicon_angle is not None
                 and self.aperture_radius is None):
             self.aperture_radius = (self.zmax*ma.tan(self.axicon_angle))
@@ -737,7 +765,6 @@ class ScalarBesselGaussBeamSuperposition(ScalarBesselGaussBeam):
     def axicon_angle(self, theta):
         self._axicon_angle = theta
         self._axicon_angle_degree = 180*theta/pi
-
 
         if self.longitudinal_wavenumber is not None:
             kz = self.longitudinal_wavenumber
@@ -780,7 +807,7 @@ class ScalarBesselGaussBeamSuperposition(ScalarBesselGaussBeam):
         self.__create_superposition()
 
     def __create_superposition(self):
-        if Beam.is_all_parameters_defined(self) is False:
+        if Beam.is_all_params_defined(self) is False:
             return
 
         def amplitude_n(n):
@@ -814,12 +841,11 @@ class ScalarFrozenWave(Beam):
 
     params = Beam.params + intrinsic_params
 
-    def __init__(self, **kwargs):
+    def __init__(self, centered=True, **kwargs):
         Beam.__init__(self, self)
-
         self.name = 'scalar-frozen-wave'
-
         self.beams = [self]
+        self.centered = centered
 
         self._Q = None
         self._N = None
@@ -827,7 +853,7 @@ class ScalarFrozenWave(Beam):
         self._bessel_order = 0
         self._reference_function = None  # string
         self.func = None  # function
-        self.amplitudes = []
+        #self.amplitudes = []
 
         for key, value in kwargs.items():
             if hasattr(self, '_' + key):
@@ -881,15 +907,18 @@ class ScalarFrozenWave(Beam):
         self.__create_superposition()
 
     def __create_superposition(self):
-        if (Beam.is_all_parameters_defined(self) is False
-                or self.func is None):
+        if (Beam.is_all_params_defined(self) is False or self.func is None):
             return
 
         def amplitude_n(n):
             func_real = lambda z: (self.func(z)*cm.exp(-2j*pi*z*n/self.L)).real
             func_imag = lambda z: (self.func(z)*cm.exp(-2j*pi*z*n/self.L)).imag
-            an_real, err = quad(func_real, -self.L/2, self.L/2)
-            an_imag, err = quad(func_imag, -self.L/2, self.L/2)
+            if self.centered:
+                an_real, err = quad(func_real, -self.L/2, self.L/2)
+                an_imag, err = quad(func_imag, -self.L/2, self.L/2)
+            else:
+                an_real, err = quad(func_real, 0, self.L)
+                an_imag, err = quad(func_imag, 0, self.L)
             return (an_real + 1j*an_imag)/self.L
 
         if 2*pi*self.N/self.L > self.wavenumber/2:
@@ -921,11 +950,12 @@ class ScalarFrozenWave(Beam):
             beam.longitudinal_wavenumber = self.Q + 2*pi*n_index/self.L
             beam.bessel_order = self.bessel_order
             self.beams.append(beam)
-            self.amplitudes.append(amplitude_n(n_index))
+            #self.amplitudes.append(amplitude_n(n_index))
 
-    def psi(self, x1, x2, x3, system='cartesian'):
-        return (self._amplitude*cm.exp(1j*self._phase)
-                *sum([beam.psi(x1, x2, x3, system) for beam in self.beams]))
+    #def psi(self, x1, x2, x3, system='cartesian'):
+    #    return (self._amplitude*cm.exp(1j*self._phase)
+    #            *sum([beam.psi(x1, x2, x3, system)
+    #                 for beam in self.beams]))
 
 
 class VectorialBeam(Beam):
@@ -933,25 +963,44 @@ class VectorialBeam(Beam):
 
     params = Beam.params + intrinsic_params
 
-    def __init__(self, **kwargs):
-        Beam.__init__(self, self)
+    def __init__(self, beams, name='generic-vectorial-beam'):
+        Beam.__init__(self, beams, name)
 
-        self.beams = [self]
+    def __add__(self, other):
+        # raise error if one generic params if different from another.
+        if self.wavelength != other.wavelength:
+            raise NameError('Beams with differents wavelength')
+        if self.vacuum_wavelength != other.vacuum_wavelength:
+            raise NameError('Beams with differents vacuum_wavelength')
 
-        self.name = 'generic-vectorial-beam'
+        # effetuate the sum because all generic params are equal.
+        beams = []
+        for beam in self.beams:
+            beam._amplitude *= self._amplitude
+            beam._phase += self._phase
+            beams.append(copy.copy(beam))
 
-        for key, value in kwargs.items():
-            if hasattr(self, '_' + key):
-                setattr(self, key, value)
+        for beam in other.beams:
+            beam._amplitude *= other._amplitude
+            beam._phase += other._phase
+            beams.append(copy.copy(beam))
+
+        return VectorialBeam(beams)
 
     def Ex(self, x1, x2, x3, system='cartesian'):
-        return 1
+        return (self._amplitude*cm.exp(1j*self._phase)
+                *sum([beam.Ex(x1, x2, x3, system)
+                      for beam in self.beams]))
 
     def Ey(self, x1, x2, x3, system='cartesian'):
-        return 0
+        return (self._amplitude*cm.exp(1j*self._phase)
+                *sum([beam.Ey(x1, x2, x3, system)
+                      for beam in self.beams]))
 
     def Ez(self, x1, x2, x3, system='cartesian'):
-        return 0
+        return (self._amplitude*cm.exp(1j*self._phase)
+                *sum([beam.Ez(x1, x2, x3, system)
+                      for beam in self.beams]))
 
     def E(self, x1, x2, x3, system='cartesian'):
         return (self.Ex(x1, x2, x3, system),
@@ -961,47 +1010,49 @@ class VectorialBeam(Beam):
     def electric_field(self, x1, x2, x3, system='cartesian'):
         return self.E(x1, x2, x3, system)
 
+    def H(self, x1, x2, x3, system='cartesian'):
+        Hx = (self._amplitude*cm.exp(1j*self._phase)
+              *sum([beam.Hx(x1, x2, x3, system)
+                    for beam in self.beams]))
+
+        Hy = (self._amplitude*cm.exp(1j*self._phase)
+              *sum([beam.Hy(x1, x2, x3, system)
+                    for beam in self.beams]))
+
+        Hz = (self._amplitude*cm.exp(1j*self._phase)
+              *sum([beam.Hz(x1, x2, x3, system)
+                    for beam in self.beams]))
+
+        return (Hx, Hy, Hz)
+
+    def magnetic_field(self, x1, x2, x3, system='cartesian'):
+        return self.H(x1, x2, x3, system)
+
     def intensity(self, x1, x2, x3, system='cartesian'):
-        return np.linalg.norm(self.E(x1, x2, x3, system))
+        Ex, Ey, Ez = self.E(x1, x2, x3, system)
+        return abs(Ex)**2 + abs(Ey)**2 + abs(Ez)**2
 
     def electric_field_direction(self, x1, x2, x3, system='cartesian'):
         E0 = self.E(x1, x2, x3, system)
         E0_abs = np.linalg.norm(E0)
-        return [E/E0_abs for E in E0]
-
-    def Hx(self, x1, x2, x3, system='cartesian'):
-        return 0
-
-    def Hy(self, x1, x2, x3, system='cartesian'):
-        return 1
-
-    def Hz(self, x1, x2, x3, system='cartesian'):
-        return 0
-
-    def H(self, x1, x2, x3, system='cartesian'):
-        return (self.Hx(x1, x2, x3, system),
-                self.Hy(x1, x2, x3, system),
-                self.Hz(x1, x2, x3, system),)
+        return [abs(E)/E0_abs for E in E0]
 
     def wavenumber_direction(self, x1, x2, x3, system='cartesian'):
-        print('asd')
         wdir = np.cross(self.E(x1, x2, x3, system), self.H(x1, x2, x3, system))
         wdir_abs = np.linalg.norm(wdir)
-        return [k/wdir_abs for k in wdir]
+        return [abs(k)/wdir_abs for k in wdir]
 
 
 class VectorialBesselBeam(ScalarBesselBeam, VectorialBeam):
     intrinsic_params = ScalarBesselBeam.intrinsic_params
     intrinsic_params += VectorialBeam.intrinsic_params
-
-    params = Beam.params + intrinsic_params
+    params = VectorialBeam.params + intrinsic_params
 
     def __init__(self, **kwargs):
         ScalarBesselBeam.__init__(self)
-        VectorialBeam.__init__(self)
+        VectorialBeam.__init__(self, self)
 
         self.beams = [self]
-
         self.name = 'vectorial-bessel-beam'
 
         for key, value in kwargs.items():
@@ -1011,70 +1062,245 @@ class VectorialBesselBeam(ScalarBesselBeam, VectorialBeam):
     #def wavenumber_direction(self, x1, x2, x3, system='cartesian'):
     #    return super(ScalarBesselBeam, self).wavenumber_direction(x1, x2, x3, system)
 
+    def __some_params(self):
+        return (self._longitudinal_wavenumber,
+                self._transversal_wavenumber,
+                self._bessel_order,
+                self._axicon_angle,)
+
     def Ex(self, x1, x2, x3, system='cartesian'):
-        point = Point(x1, x2, x3, system)
-        z = point.z
-        phi = point.phi
-        rho = point.rho
-        krho = self._longitudinal_wavenumber
-        kz = self._transversal_wavenumber
-        ni = self._bessel_order
-        alpha = self._axicon_angle
-        return (0.25*(1+ma.cos(alpha))*(-1j)**ni*cm.exp(-1j*kz*z)
+        if system == 'cylindrical':
+            rho, phi, z = x1, x2, x3
+        else:
+            rho, phi, z = Point(x1, x2, x3, system).cylindrical()
+
+        kz, krho, ni, alpha = self.__some_params()
+
+        return (self._amplitude*cm.exp(1j*self._phase)
+                *0.25*(1+ma.cos(alpha))*(-1j)**ni*cm.exp(-1j*kz*z)
                 *(+(1+ma.cos(alpha))*ss.jv(ni, krho*rho)
-                  +0.5*(1-ma.cos(alpha))*(+cm.exp(+2j*phi)*ss.jv(ni+2, krho*rho)
-                                          +cm.exp(-2j*phi)*ss.jv(ni-2, krho*rho)
-                                         )
-                 )
-               )
+                  +0.5*(1-ma.cos(alpha))*(+cm.exp(+2j*phi)
+                                           *ss.jv(ni+2, krho*rho)
+                                          +cm.exp(-2j*phi)
+                                           *ss.jv(ni-2, krho*rho))))
 
     def Ey(self, x1, x2, x3, system='cartesian'):
-        point = Point(x1, x2, x3, system)
-        z = point.z
-        phi = point.phi
-        rho = point.rho
-        krho = self._longitudinal_wavenumber
-        kz = self._transversal_wavenumber
-        ni = self._bessel_order
-        alpha = self._axicon_angle
-        #return 0
-        return (0.25*(1+ma.cos(alpha))*(-1j)**ni*cm.exp(-1j*kz*z)
-                *(-0.5j*(1-ma.cos(alpha))*(+cm.exp(+2j*phi)*ss.jv(ni+2, krho*rho)
-                                           -cm.exp(-2j*phi)*ss.jv(ni-2, krho*rho)
-                                          )
-                 )
-               )
+        if system == 'cylindrical':
+            rho, phi, z = x1, x2, x3
+        else:
+            rho, phi, z = Point(x1, x2, x3, system).cylindrical()
+
+        kz, krho, ni, alpha = self.__some_params()
+
+        return (self._amplitude*cm.exp(1j*self._phase)
+                *0.25*(1+ma.cos(alpha))*(-1j)**ni*cm.exp(-1j*kz*z)
+                *(-0.5j*(1-ma.cos(alpha))*(+cm.exp(+2j*phi)
+                                            *ss.jv(ni+2, krho*rho)
+                                           -cm.exp(-2j*phi)
+                                            *ss.jv(ni-2, krho*rho))))
 
     def Ez(self, x1, x2, x3, system='cartesian'):
-        point = Point(x1, x2, x3, system)
-        z = point.z
-        phi = point.phi
-        rho = point.rho
-        krho = self._longitudinal_wavenumber
-        kz = self._transversal_wavenumber
-        ni = self._bessel_order
-        alpha = self._axicon_angle
-        #return 0
-        return (0.25*(1+ma.cos(alpha))*(-1j)**ni*cm.exp(-1j*kz*z)
-                *(+1j*ma.sin(alpha)*(+cm.exp(+1j*phi)*ss.jv(ni+1, krho*rho)
-                                     -cm.exp(-1j*phi)*ss.jv(ni-1, krho*rho)
-                                    )
-                 )
-               )
+        if system == 'cylindrical':
+            rho, phi, z = x1, x2, x3
+        else:
+            rho, phi, z = Point(x1, x2, x3, system).cylindrical()
+
+        kz, krho, ni, alpha = self.__some_params()
+
+        return (self._amplitude*cm.exp(1j*self._phase)
+                *0.25*(1+ma.cos(alpha))*(-1j)**ni*cm.exp(-1j*kz*z)
+                *(+1j*ma.sin(alpha)*(+cm.exp(+1j*phi)
+                                      *ss.jv(ni+1, krho*rho)
+                                     -cm.exp(-1j*phi)
+                                      *ss.jv(ni-1, krho*rho))))
+
+    def Hx(self, x1, x2, x3, system='cartesian'):
+        if system == 'cylindrical':
+            rho, phi, z = x1, x2, x3
+        else:
+            rho, phi, z = Point(x1, x2, x3, system).cylindrical()
+
+        kz, krho, ni, alpha = self.__some_params()
+
+        const = SPEED_OF_LIGHT*VACUUM_PERMEABILITY
+
+        return (self._amplitude*cm.exp(1j*self._phase)/const
+                *0.25*(1+ma.cos(alpha))*(-1j)**ni*cm.exp(-1j*kz*z)
+                *(-0.5j*(1-ma.cos(alpha))*(+cm.exp(+2j*phi)
+                                            *ss.jv(ni+2, krho*rho)
+                                           -cm.exp(-2j*phi)
+                                            *ss.jv(ni-2, krho*rho))))
+
+    def Hy(self, x1, x2, x3, system='cartesian'):
+        if system == 'cylindrical':
+            rho, phi, z = x1, x2, x3
+        else:
+            rho, phi, z = Point(x1, x2, x3, system).cylindrical()
+
+        kz, krho, ni, alpha = self.__some_params()
+
+        const = SPEED_OF_LIGHT*VACUUM_PERMEABILITY
+
+        return (self._amplitude*cm.exp(1j*self._phase)/const
+                *0.25*(1+ma.cos(alpha))*(-1j)**ni*cm.exp(-1j*kz*z)
+                *(+(1+ma.cos(alpha))*ss.jv(ni, krho*rho)
+                  -0.5*(1-ma.cos(alpha))*(+cm.exp(+2j*phi)
+                                           *ss.jv(ni+2, krho*rho)
+                                          +cm.exp(-2j*phi)
+                                           *ss.jv(ni-2, krho*rho))))
+
+    def Hz(self, x1, x2, x3, system='cartesian'):
+        if system == 'cylindrical':
+            rho, phi, z = x1, x2, x3
+        else:
+            rho, phi, z = Point(x1, x2, x3, system).cylindrical()
+
+        kz, krho, ni, alpha = self.__some_params()
+
+        const = SPEED_OF_LIGHT*VACUUM_PERMEABILITY
+
+        return (self._amplitude*cm.exp(1j*self._phase)/const
+                *0.25*(1+ma.cos(alpha))*(-1j)**ni*cm.exp(-1j*kz*z)
+                *(ma.sin(alpha)*(+cm.exp(+1j*phi)
+                                  *ss.jv(ni+1, krho*rho)
+                                 +cm.exp(-1j*phi)
+                                  *ss.jv(ni-1, krho*rho))))
+
+
+class VectorialFrozenWave(VectorialBeam):
+    intrinsic_params = ('_Q',
+                        '_N',
+                        '_L',
+                        '_bessel_order',
+                        '_reference_function',)
+
+    params = VectorialBeam.params + intrinsic_params
+
+    def __init__(self, centered=True, **kwargs):
+        VectorialBeam.__init__(self, self)
+
+        self.name = 'vectorial-frozen-wave'
+        self.beams = [self]
+        self.centered = centered
+
+        self._Q = None
+        self._N = None
+        self._L = None
+        self._bessel_order = 0
+        self._reference_function = None  # string
+        self.func = None  # function
+        #self.amplitudes = []
+
+        for key, value in kwargs.items():
+            if hasattr(self, '_' + key):
+                setattr(self, key, value)
+
+        self.__create_superposition()
+
+    @property
+    def Q(self):
+        return self._Q
+
+    @Q.setter
+    def Q(self, value):
+        self._Q = value
+        self.__create_superposition()
+
+    @property
+    def N(self):
+        return self._N
+
+    @N.setter
+    def N(self, value):
+        self._N = value
+        self.__create_superposition()
+
+    @property
+    def L(self):
+        return self._L
+
+    @L.setter
+    def L(self, value):
+        self._L = value
+        self.__create_superposition()
+
+    @property
+    def bessel_order(self):
+        return self._bessel_order
+
+    @bessel_order.setter
+    def bessel_order(self, value):
+        self._bessel_order = value
+
+    @property
+    def reference_function(self):
+        return self.func
+
+    @reference_function.setter
+    def reference_function(self, func):
+        self.func = func
+        self._reference_function = 'Already defined (name: %s)' % func.__name__
+        self.__create_superposition()
+
+    def __create_superposition(self):
+        if (Beam.is_all_params_defined(self) is False or self.func is None):
+            return
+
+        def amplitude_n(n):
+            func_real = lambda z: (self.func(z)*cm.exp(-2j*pi*z*n/self.L)).real
+            func_imag = lambda z: (self.func(z)*cm.exp(-2j*pi*z*n/self.L)).imag
+
+            if self.centered:
+                an_real, err = quad(func_real, -self.L/2, self.L/2)
+                an_imag, err = quad(func_imag, -self.L/2, self.L/2)
+            else:
+                an_real, err = quad(func_real, 0, self.L)
+                an_imag, err = quad(func_imag, 0, self.L)
+
+            return (an_real + 1j*an_imag)/self.L
+
+        if 2*pi*self.N/self.L > self.wavenumber/2:
+            error_msg = 'Combination of N, L and k does not '
+            error_msg += 'satisfy Q range condition.'
+            raise NameError(error_msg)
+
+        if self.Q + 2*pi*self.N/self.L > self.wavenumber:
+            msg = 'Q is too large. '
+            msg += 'It was changed from %fk '%(self.Q/self.wavenumber)
+            self.Q = self.wavenumber - 2*pi*self.N/self.L
+            msg += 'to %fk.' % (self.Q/self.wavenumber)
+            print(msg)
+
+        if self.Q - 2*pi*self.N/self.L < 0:
+            msg = 'Q is too low. '
+            msg += 'It was changed from %fk '%(self.Q/self.wavenumber)
+            self.Q = 2*pi*self.N/self.L
+            msg += 'to %fk.' % (self.Q/self.wavenumber)
+            print(msg)
+
+        self.beams = []
+        for i in range(2*self.N + 1):
+            n_index = i - self.N
+            beam = VectorialBesselBeam()
+            beam.wavelength = self.wavelength
+            beam.medium_refractive_index = self.medium_refractive_index
+            beam.longitudinal_wavenumber = self.Q + 2*pi*n_index/self.L
+            beam.amplitude = (amplitude_n(n_index)*4
+                              /(1+ma.cos(beam._axicon_angle))**2)
+            beam.bessel_order = self.bessel_order
+            self.beams.append(beam)
+
 
 class Point(object):
     def __init__(self, x1, x2, x3, system='cartesian'):
         if system == 'cartesian':
             self.__init(x1, x2, x3)
-
         elif system == 'cylindrical':
             self.__init(x1*ma.cos(x2), x1*ma.sin(x2), x3)
-
         elif system == 'spherical':
             self.__init(x1*ma.sin(x2)*ma.cos(x3),
                         x1*ma.sin(x2)*ma.sin(x3),
                         x1*ma.cos(x2))
-
         else:
             raise NameError('System not defined. Choose amoung '
                             + '"cartesian", "cylindrical" or "spherical".')
@@ -1083,7 +1309,7 @@ class Point(object):
         x = self.x + other.x
         y = self.y + other.y
         z = self.z + other.z
-        return Point([x, y, z])
+        return Point(x, y, z)
 
     def __radd__(self, other):
         if other == 0:
@@ -1095,7 +1321,7 @@ class Point(object):
         x = self.x - other.x
         y = self.y - other.y
         z = self.z - other.z
-        return Point([x, y, z])
+        return Point(x, y, z)
 
     def __str__(self):
         return ("cartesian = (%s, %s, %s)."
@@ -1151,15 +1377,93 @@ class Point(object):
 if __name__ == "__main__":
     print("Please, visit: https://github.com/arantespp/opticalforces")
 
-    vbb = VectorialBesselBeam()
-    vbb.wavelength = 1064e-9
-    vbb.medium_refractive_index = 1.33
-    vbb.amplitude = 5
-    vbb.axicon_angle_degree = 10
-    vbb.bessel_order = 3
+    vbb0 = VectorialBesselBeam()
+    vbb0.wavelength = 1064e-9
+    vbb0.medium_refractive_index = 1.33
+    vbb0.amplitude = 5
+    vbb0.axicon_angle_degree = 10
+    vbb0.bessel_order = 3
 
-    #print(vbb)
-    print(vbb.intensity(0.0003,0.0008,0.01))
+    vbb1 = VectorialBesselBeam()
+    vbb1.wavelength = 1064e-9
+    vbb1.medium_refractive_index = 1.33
+    vbb1.amplitude = 5
+    vbb1.axicon_angle_degree = 10
+    vbb1.bessel_order = 0
+
+    vbb2 = VectorialBesselBeam()
+    vbb2.wavelength = 1064e-9
+    vbb2.medium_refractive_index = 1.33
+    vbb2.amplitude = 1
+    vbb2.axicon_angle_degree = 15
+    vbb2.bessel_order = 2
+
+    sbb2 = ScalarBesselBeam()
+    sbb2.wavelength = 1064e-9
+    sbb2.medium_refractive_index = 1.33
+    sbb2.amplitude = 1
+    sbb2.axicon_angle_degree = 15
+    sbb2.bessel_order = 0
+
+    fw1 = VectorialFrozenWave()
+    fw1.vacuum_wavelength = 1064e-9
+    fw1.medium_refractive_index = 1.33
+    fw1.Q = 0.699*fw1.wavenumber
+    fw1.N = 15
+    #print(fw1.centered)
+
+    #vbb = vbb0 + vbb1 + vbb2
+
+    rho, phi, z = 0.03, 8, 0.01
+
+    #print(vbb2)
+
+    #Ex = vbb2.Ex(rho, phi, z, 'cylindrical')
+    #Ey = vbb2.Ey(x, y, z)
+    #Ez = vbb2.Ez(x, y, z)
+
+    print(vbb2)
+    print('Ex', vbb2.Ex(rho, phi, z, 'cylindrical'))
+    print('Ey', vbb2.Ey(rho, phi, z, 'cylindrical'))
+    print('Ez', vbb2.Ez(rho, phi, z, 'cylindrical'))
+    print('Hx', vbb2.Hx(rho, phi, z, 'cylindrical'))
+    print('Hy', vbb2.Hy(rho, phi, z, 'cylindrical'))
+    print('Hz', vbb2.Hz(rho, phi, z, 'cylindrical'))
+
+
+    #print(Ex0, Ex1)
+    #print(Ex0 + Ex1 + Ex2)
+    #print(vbb.Ex(x, y, z))
+
+    def ref_func(z):
+        if abs(z) < 0.35*0.1:
+            return ss.jv(0, 500*z)
+        else:
+            return 0
+
+    fw = ScalarFrozenWave()
+    fw.wavelength = 1064e-9
+    fw.medium_refractive_index = 1.33
+    fw.amplitude = 8
+    fw.phase = 3
+    fw.Q = 0.99*fw.wavenumber
+    fw.N = 3
+    fw.L = 0.1
+    fw.bessel_order = 0
+    #print(fw)
+    fw.reference_function = ref_func
+
+    #print(fw.psi(0.002*0,0,0.003*0))
+
+    vfw = VectorialFrozenWave()
+    vfw.wavelength = 1064e-9
+    vfw.medium_refractive_index = 1.33
+    vfw.Q = 0.99*vfw.wavenumber
+    vfw.N = 5
+    vfw.L = 0.1
+    vfw.reference_function = ref_func
+
+    #print(vfw.electric_field_direction(x, y, z))
 
     '''vb = VectorialBeam()
 
