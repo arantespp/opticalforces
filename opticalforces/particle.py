@@ -66,6 +66,8 @@ def check_database(regime):
                     for row in reader:
                         if (row['x'], row['y'], row['z']) == _beam_pos:
                             return float(row['force'])
+            else:
+                os.makedirs(database_subdir)
 
             _force = func(self, beam, beam_pos, force_dir, force_type)
 
@@ -344,13 +346,15 @@ class SphericalParticle(object):
 
             return val
 
-        return quad_integration()
+        #return quad_integration()
+        return time.time()
 
 
 if __name__ == '__main__':
     print("Please, visit: https://github.com/arantespp/opticalforces")
 
     from beam import VectorialFrozenWave, Point
+    import pandas as pd
 
     def ref_func(z):
         if abs(z) < 0.35*0.1:
@@ -372,4 +376,9 @@ if __name__ == '__main__':
     ptc.medium_refractive_index = 1.33
     ptc.refractive_index = 1.6
 
-    print(ptc.geo_opt_force(vfw, Point(0,0,0.01), 'fz', 'total'))
+    #print(ptc.geo_opt_force(vfw, Point(0,0,0.01), 'fz', 'total'))
+
+    a = pd.DataFrame(columns=('a', 'b'))
+    a = a.append({'a':1,'b':2}, ignore_index=True)
+
+    print(a)
