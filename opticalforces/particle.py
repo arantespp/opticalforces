@@ -6,8 +6,11 @@ from functools import wraps
 import time
 from scipy.integrate import quad
 import csv
-import numpy
+import pandas as pd
+import numpy as np
 import os
+
+import random
 
 from beam import Point
 
@@ -36,56 +39,136 @@ def timing(func):
         return _func
     return wrapped
 
-def check_database(regime):
-    def force(func):
-        @wraps(func)
-        def wrapped(self, beam, beam_pos, force_dir, force_type):
-            # Database's name
-            database_name = self.name
-            database_name += '-' + beam.name
-            database_name += '-' + force_dir
-            database_name += '-' + force_type
-            database_name += '-' + regime
-            database_name += '.csv'
+def check_geo_opt_database(func):
+    @wraps(func)
+    def wrapped(self, beam, beam_pos, force_dir, force_type='total',
+                paramx=None, paramy=None):
 
-            database_subdir = 'database'
+        database_name = '_'.join([self.name, beam.name, 'geo-opt.pkl'])
+        database_dir = 'database'
+        database_full_path = os.path.join(database_dir, database_name)
 
-            full_path = os.path.join(database_subdir, database_name)
+        if not os.path.isdir(database_dir):
+            os.makedirs(database_dir)
 
-            field_names = ['x', 'y', 'z', 'force']
+        # params without force
+        params = {'beam_pos_x': round_sig(beam_pos.x),
+                  'beam_pos_y': round_sig(beam_pos.y),
+                  'beam_pos_z': round_sig(beam_pos.z),
+                  'force_type': force_type,}
 
-            delimiter = ','
+        for param in self.params:
+            params.update({param[1:]: round_sig(self.__dict__[param])})
 
-            _beam_pos = (str(round_sig(beam_pos.x)),
-                         str(round_sig(beam_pos.y)),
-                         str(round_sig(beam_pos.z)),)
-
-            if os.path.isfile(full_path):
-                with open(full_path) as database:
-                    reader = csv.DictReader(database, delimiter=delimiter)
-                    for row in reader:
-                        if (row['x'], row['y'], row['z']) == _beam_pos:
-                            return float(row['force'])
+        @timing
+        def get_force_from_params(params):
+            # load a dataframe or create if it doesn't exist
+            if os.path.isfile(database_full_path):
+                df = pd.read_pickle(database_full_path)
             else:
-                os.makedirs(database_subdir)
+                full_params = params.copy()
+                full_params.update({'fx': np.nan,
+                                    'fy': np.nan,
+                                    'fz': np.nan,})
+                df = pd.DataFrame.from_dict([full_params])
 
-            _force = func(self, beam, beam_pos, force_dir, force_type)
+            dff = df[(df[list(params)] == pd.Series(params)).all(axis=1)]
 
-            with open(full_path, 'a+') as database:
-                writer = csv.DictWriter(database, fieldnames=field_names)
-                database.seek(0) #ensure you're at the start of the file..
-                if not database.read(1):
-                    writer.writeheader()
-                writer.writerow({'x': _beam_pos[0],
-                                 'y': _beam_pos[1],
-                                 'z': _beam_pos[2],
-                                 'force': _force,})
+            if dff.empty:
+                force = func(self, beam, beam_pos, force_dir, force_type)
+                _params = params.copy()
+                _params[force_dir] = force
+                df = df.append(_params, ignore_index=True)
+                df.to_csv(database_full_path[:-3] + 'csv', index=False)
+                df.to_pickle(database_full_path)
+                return force
+            else:
+                if np.isnan(dff.loc[dff.index[0], force_dir]):
+                    force = func(self, beam, beam_pos, force_dir, force_type)
+                    df = df.set_value(dff.index[0], force_dir, force)
+                    df.to_csv(database_full_path[:-3] + 'csv', index=False)
+                    df.to_pickle(database_full_path)
+                    return force
+                else:
+                    return dff.loc[dff.index[0], force_dir]
 
-            return _force
+        def get_force_from_range(params, paramx):
+            _params = params.copy()
+            param = paramx['param']
+            del _params[param]
 
-        return wrapped
+            _df = pd.DataFrame(columns=[param, force_dir])
 
-    return force
+            if not os.path.isfile(database_full_path):
+                return _df
+
+            df = pd.read_pickle(database_full_path)
+
+            # select all rows that have the same values as '_params'
+            df = df[(df[list(_params)] == pd.Series(_params)).all(axis=1)]
+
+            # select all rows that have 'force_dir' as a finite number
+            df = df[pd.notnull(df[force_dir])]
+
+            # select all rows that have its parameter 'param' in range
+            df = df[(df[param]>=paramx['start']) & (df[param]<=paramx['stop'])]
+
+            # fill '_df' columns with 'df' values
+            _df[param], _df[force_dir] = df[param], df[force_dir]
+
+            # add 'start' and 'stop' values to '_df'
+            if not any(_df[param] == paramx['start']):
+                new_row = {param: paramx['start'], force_dir: np.nan}
+                _df = _df.append(new_row, ignore_index=True)
+
+            if not any(_df[param] == paramx['stop']):
+                new_row = {param: paramx['stop'], force_dir: np.nan}
+                _df = _df.append(new_row, ignore_index=True)
+
+            def interval(row):
+                if row.name + 1 < _df.shape[0]:
+                    return _df[param][row.name+1] - _df[param][row.name]
+                return 0
+
+            def next_param(row):
+                if row.name + 1 < _df.shape[0]:
+                    return (_df[param][row.name+1] + _df[param][row.name])/2
+                return 0
+
+            # add rows until params reach a interval minimal
+            while True:
+                _df = _df.sort_values([param]).reset_index(drop=True)
+                _df['interval'] = _df.apply(interval, axis=1)
+                _df['next_param'] = _df.apply(next_param, axis=1)
+
+                inter_max = (paramx['stop']-paramx['start'])/(paramx['num']-1)
+
+                if _df['interval'].max() <= inter_max:
+                    break
+
+                new_row = {param: _df['next_param'][_df['interval'].idxmax()],
+                           force_dir: np.nan,}
+
+                _df = _df.append(new_row, ignore_index=True)
+
+            # calculate force of every 'force_dir' that is 'np.nan'
+            while _df[force_dir].isnull().values.any():
+                _params = params.copy()
+                for idx in range(_df.shape[0]):
+                    _params[param] = _df[param][idx]
+                    _df[force_dir][idx] = get_force_from_params(_params)
+
+            return _df[param].values.tolist(), _df[force_dir].values.tolist()
+
+        if paramx is None:
+            return get_force_from_params(params)
+        else:
+            if not paramx['param'] in params:
+                raise ValueError('param in paramx does not exist.')
+
+            return get_force_from_range(params, paramx)
+
+    return wrapped
 
 
 class SphericalParticle(object):
@@ -160,20 +243,20 @@ class SphericalParticle(object):
 
     @staticmethod
     def ortonormal_ray_direction(ray_direction, normal):
-        dot = numpy.dot(ray_direction, normal)
+        dot = np.dot(ray_direction, normal)
         if dot == 0:
             return normal
 
         d0 = [n-k for n, k in zip(normal, [dot*k for k in ray_direction])]
 
-        if numpy.linalg.norm(d0) == 0:
+        if np.linalg.norm(d0) == 0:
             return [0, 0, 0]
 
-        return [d/numpy.linalg.norm(d0) for d in d0]
+        return [d/np.linalg.norm(d0) for d in d0]
 
     @staticmethod
     def incident_angle(ray_direction, normal):
-        return ma.acos(-numpy.dot(ray_direction, normal))
+        return ma.acos(-np.dot(ray_direction, normal))
 
     @staticmethod
     def refracted_angle(incident_angle, medium_refractive_index,
@@ -186,12 +269,12 @@ class SphericalParticle(object):
         """ Crossing angle between the polarization direction of the
         incident beam and the normal vector of the incident plane."""
 
-        plane_normal = numpy.cross(ray_direction, normal)
-        if numpy.linalg.norm(plane_normal) == 0:
+        plane_normal = np.cross(ray_direction, normal)
+        if np.linalg.norm(plane_normal) == 0:
             return 0
 
-        div = (numpy.dot(electric_field, plane_normal)
-               /numpy.linalg.norm(plane_normal))
+        div = (np.dot(electric_field, plane_normal)
+               /np.linalg.norm(plane_normal))
 
         if abs(div) >= 1:
             return 0
@@ -265,9 +348,9 @@ class SphericalParticle(object):
                     / (1+reflectivity*internal_attenuation
                        * cm.exp(+2j*refracted_angle)))
 
-    @timing
-    @check_database('geo-opt')
-    def geo_opt_force(self, beam, beam_pos, force_dir, force_type='total'):
+    #@timing
+    @check_geo_opt_database
+    def geo_opt_force(self, beam, beam_pos, force_dir, force_type):
         """ Force that beam causes in a spherical particle in a deter-
         mined position in geometrical optics regime (particle radius is
         greater than 10 times beam's wavelenght).
@@ -347,7 +430,7 @@ class SphericalParticle(object):
             return val
 
         #return quad_integration()
-        return time.time()
+        return random.random()
 
 
 if __name__ == '__main__':
@@ -372,13 +455,40 @@ if __name__ == '__main__':
 
     # ----- particle definition
     ptc = SphericalParticle()
-    ptc.radius = 17.5e-6
+    ptc.radius = 10e-6
     ptc.medium_refractive_index = 1.33
-    ptc.refractive_index = 1.6
+    ptc.refractive_index = 1.2667890
 
-    #print(ptc.geo_opt_force(vfw, Point(0,0,0.01), 'fz', 'total'))
+    paramx = {'param': 'radius',
+              'start': 1e-6,
+              'stop': 200e-6,
+              'num': 20,}
 
-    a = pd.DataFrame(columns=('a', 'b'))
-    a = a.append({'a':1,'b':2}, ignore_index=True)
+    print(ptc.geo_opt_force(beam=vfw, beam_pos=Point(3,22.1,0.01),
+                            force_dir='fy', paramx=paramx))
 
-    print(a)
+    #print('\n $$$$$$$$$$$$$$$$$$$$')
+
+    #print(ptc.geo_opt_force(beam=vfw, beam_pos=Point(1,0.1,0.01),
+    #                        force_dir='fz', paramx=paramx))
+
+    #print('\n $$$$$$$$$$$$$$$$$$$$')
+
+    #print(ptc.geo_opt_force(beam=vfw, beam_pos=Point(2,0.1,0.01),
+    #                        force_dir='fz', paramx=paramx))
+
+    df = pd.DataFrame(columns=('a', 'b', 'c'))
+    df = df.append({'a':1,'b':2, 'c':np.nan}, ignore_index=True)
+    df = df.append({'a':1,'b':2, 'c':np.nan}, ignore_index=True)
+    df = df.append({'a':3,'b':3, 'c':np.nan}, ignore_index=True)
+    df = df.append({'a':2,'b':5, 'c':np.nan}, ignore_index=True)
+
+    filt = {'a':2, 'b':5}
+
+    dff = df[(df[list(filt)]==pd.Series(filt)).all(axis=1)]
+
+    #print(dff)
+
+    df.set_value(dff.index[0], 'c', 4)
+
+    #print(df)
