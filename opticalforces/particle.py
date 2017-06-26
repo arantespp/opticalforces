@@ -438,6 +438,9 @@ if __name__ == '__main__':
 
     from beam import VectorialFrozenWave, Point
     import pandas as pd
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d import Axes3D
+    from matplotlib import cm as cmplt
 
     def ref_func(z):
         if abs(z) < 0.35*0.1:
@@ -464,31 +467,7 @@ if __name__ == '__main__':
               'stop': 200e-6,
               'num': 20,}
 
-    print(ptc.geo_opt_force(beam=vfw, beam_pos=Point(3,22.1,0.01),
-                            force_dir='fy', paramx=paramx))
+    X, F = ptc.geo_opt_force(beam=vfw, beam_pos=Point(3,22.1,0.01), force_dir='fy', paramx=paramx)
 
-    #print('\n $$$$$$$$$$$$$$$$$$$$')
-
-    #print(ptc.geo_opt_force(beam=vfw, beam_pos=Point(1,0.1,0.01),
-    #                        force_dir='fz', paramx=paramx))
-
-    #print('\n $$$$$$$$$$$$$$$$$$$$')
-
-    #print(ptc.geo_opt_force(beam=vfw, beam_pos=Point(2,0.1,0.01),
-    #                        force_dir='fz', paramx=paramx))
-
-    df = pd.DataFrame(columns=('a', 'b', 'c'))
-    df = df.append({'a':1,'b':2, 'c':np.nan}, ignore_index=True)
-    df = df.append({'a':1,'b':2, 'c':np.nan}, ignore_index=True)
-    df = df.append({'a':3,'b':3, 'c':np.nan}, ignore_index=True)
-    df = df.append({'a':2,'b':5, 'c':np.nan}, ignore_index=True)
-
-    filt = {'a':2, 'b':5}
-
-    dff = df[(df[list(filt)]==pd.Series(filt)).all(axis=1)]
-
-    #print(dff)
-
-    df.set_value(dff.index[0], 'c', 4)
-
-    #print(df)
+    plt.plot(X, F)
+    plot.show()
