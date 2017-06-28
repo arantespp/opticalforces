@@ -5,17 +5,19 @@ from numbers import Number
 from functools import wraps
 import time
 from scipy.integrate import quad
-import csv
+import copy
 import pandas as pd
 import numpy as np
 import os
 
-import random
-
 from beam import Point
+
+import pyperclip
+
 
 # Speed of light.
 SPEED_OF_LIGHT = 299792458
+
 
 def round_sig(num, sig=4):
     if isinstance(num, Number):
@@ -29,15 +31,6 @@ def round_sig(num, sig=4):
     elif isinstance(num, list):
         return [round_sig(element) for element in num]
 
-def timing(func):
-    @wraps(func)
-    def wrapped(*args, **kwargs):
-        print('start:', time.strftime("%d %b %Y %H:%M:%S", time.localtime()))
-        time0 = time.time()
-        _func = func(*args, **kwargs)
-        print('time:', time.time() - time0)
-        return _func
-    return wrapped
 
 def check_geo_opt_database(func):
     @wraps(func)
@@ -60,7 +53,6 @@ def check_geo_opt_database(func):
         for param in self.params:
             params.update({param[1:]: round_sig(self.__dict__[param])})
 
-        @timing
         def get_force_from_params(params):
             # load a dataframe or create if it doesn't exist
             if os.path.isfile(database_full_path):
@@ -74,23 +66,39 @@ def check_geo_opt_database(func):
 
             dff = df[(df[list(params)] == pd.Series(params)).all(axis=1)]
 
+            # save old values
+            old_ptc = copy.copy(self)
+
+            # change particle parameters to new values
+            for param in self.params:
+                setattr(self, param, params[param[1:]])
+
+            # change position parameters to new values
+            _beam_pos = Point(params['beam_pos_x'],
+                              params['beam_pos_y'],
+                              params['beam_pos_z'],)
+
             if dff.empty:
-                force = func(self, beam, beam_pos, force_dir, force_type)
+                force = func(self, beam, _beam_pos, force_dir, force_type)
                 _params = params.copy()
                 _params[force_dir] = force
                 df = df.append(_params, ignore_index=True)
                 df.to_csv(database_full_path[:-3] + 'csv', index=False)
                 df.to_pickle(database_full_path)
-                return force
             else:
                 if np.isnan(dff.loc[dff.index[0], force_dir]):
-                    force = func(self, beam, beam_pos, force_dir, force_type)
+                    force = func(self, beam, _beam_pos, force_dir, force_type)
                     df = df.set_value(dff.index[0], force_dir, force)
                     df.to_csv(database_full_path[:-3] + 'csv', index=False)
                     df.to_pickle(database_full_path)
-                    return force
                 else:
-                    return dff.loc[dff.index[0], force_dir]
+                    force = dff.loc[dff.index[0], force_dir]
+
+            # change particle parameters to old ones
+            for param in self.params:
+                setattr(self, param, old_ptc.__dict__[param])
+
+            return force
 
         def get_force_from_range(params, paramx):
             _params = params.copy()
@@ -99,22 +107,21 @@ def check_geo_opt_database(func):
 
             _df = pd.DataFrame(columns=[param, force_dir])
 
-            if not os.path.isfile(database_full_path):
-                return _df
+            if os.path.isfile(database_full_path):
+                df = pd.read_pickle(database_full_path)
 
-            df = pd.read_pickle(database_full_path)
+                # select all rows that have the same values as '_params'
+                df = df[(df[list(_params)] == pd.Series(_params)).all(axis=1)]
 
-            # select all rows that have the same values as '_params'
-            df = df[(df[list(_params)] == pd.Series(_params)).all(axis=1)]
+                # select all rows that have 'force_dir' as a finite number
+                df = df[pd.notnull(df[force_dir])]
 
-            # select all rows that have 'force_dir' as a finite number
-            df = df[pd.notnull(df[force_dir])]
+                # select all rows that have its parameter 'param' in range
+                df = df[(df[param] >= paramx['start'])
+                        & (df[param]<=paramx['stop'])]
 
-            # select all rows that have its parameter 'param' in range
-            df = df[(df[param]>=paramx['start']) & (df[param]<=paramx['stop'])]
-
-            # fill '_df' columns with 'df' values
-            _df[param], _df[force_dir] = df[param], df[force_dir]
+                # fill '_df' columns with 'df' values
+                _df[param], _df[force_dir] = df[param], df[force_dir]
 
             # add 'start' and 'stop' values to '_df'
             if not any(_df[param] == paramx['start']):
@@ -152,16 +159,33 @@ def check_geo_opt_database(func):
                 _df = _df.append(new_row, ignore_index=True)
 
             # calculate force of every 'force_dir' that is 'np.nan'
-            while _df[force_dir].isnull().values.any():
+            if _df[force_dir].isnull().values.any():
+                nnan_init = _df[force_dir].isnull().sum()
+
                 _params = params.copy()
+
                 for idx in range(_df.shape[0]):
+                    if pd.notnull(_df[force_dir][idx]):
+                        continue
+
                     _params[param] = _df[param][idx]
+
+                    nnan_cur = _df[force_dir].isnull().sum()
+
+                    print('%d/%d'% (nnan_init-nnan_cur+1, nnan_init), end='\n')
+                    print('start:', time.strftime("%d %b %Y %H:%M:%S",
+                          time.localtime()), end='\n')
+
+                    time0 = time.time()
+
                     _df[force_dir][idx] = get_force_from_params(_params)
+
+                    print('time:', time.time() - time0, end='\n')
 
             return _df[param].values.tolist(), _df[force_dir].values.tolist()
 
         if paramx is None:
-            return get_force_from_params(params)
+            return None, get_force_from_params(params)
         else:
             if not paramx['param'] in params:
                 raise ValueError('param in paramx does not exist.')
@@ -348,7 +372,6 @@ class SphericalParticle(object):
                     / (1+reflectivity*internal_attenuation
                        * cm.exp(+2j*refracted_angle)))
 
-    #@timing
     @check_geo_opt_database
     def geo_opt_force(self, beam, beam_pos, force_dir, force_type):
         """ Force that beam causes in a spherical particle in a deter-
@@ -360,7 +383,6 @@ class SphericalParticle(object):
         trapping force of spherical particles in a focused Gaussian
         beam." Journal of Optics A: Pure and Applied Optics 10.8
         (2008): 085001.
-
         """
 
         def dforce(theta, phi):
@@ -368,10 +390,10 @@ class SphericalParticle(object):
             # match the point at theta and phi on particle surface.
             bps = Point(self.radius, theta, phi, 'spherical') - beam_pos
 
-            rho, phi, z = bps.cylindrical()
+            _rho, _phi, _z = bps.cylindrical()
 
             # Vector parallel to the direction of a single ray.
-            k0 = beam.wavenumber_direction(rho, phi, z, 'cylindrical')
+            k0 = beam.wavenumber_direction(_rho, _phi, _z, 'cylindrical')
 
             n0 = self.normal(theta, phi)
 
@@ -387,7 +409,7 @@ class SphericalParticle(object):
 
             d0 = self.ortonormal_ray_direction(k0, n0)
 
-            E0 = beam.electric_field_direction(rho, phi, z, 'cylindrical')
+            E0 = beam.electric_field_direction(_rho, _phi, _z, 'cylindrical')
 
             beta = self.crossing_angle(k0, n0, E0)
 
@@ -397,7 +419,7 @@ class SphericalParticle(object):
 
             Qt = self.Qt(thetai, thetar, reflectivity, trasmissivity, force_type)
 
-            intensity = beam.intensity(rho, phi, z, 'cylindrical')
+            intensity = beam.intensity(_rho, _phi, _z, 'cylindrical')
 
             dpower = intensity*ma.cos(thetai)
 
@@ -414,7 +436,7 @@ class SphericalParticle(object):
                 return 0
 
         def quad_integration():
-            epsrel = 1e-2
+            epsrel = 1e-3
             epsabs = 1e-18
             limit = 999
 
@@ -429,45 +451,9 @@ class SphericalParticle(object):
 
             return val
 
-        #return quad_integration()
-        return random.random()
+        return quad_integration()
 
 
 if __name__ == '__main__':
     print("Please, visit: https://github.com/arantespp/opticalforces")
 
-    from beam import VectorialFrozenWave, Point
-    import pandas as pd
-    import matplotlib.pyplot as plt
-    from mpl_toolkits.mplot3d import Axes3D
-    from matplotlib import cm as cmplt
-
-    def ref_func(z):
-        if abs(z) < 0.35*0.1:
-            return 1
-        else:
-            return 0
-
-    vfw = VectorialFrozenWave()
-    vfw.wavelength = 1064e-9
-    vfw.medium_refractive_index = 1.33
-    vfw.Q = 0.99*vfw.wavenumber
-    vfw.N = 5
-    vfw.L = 0.1
-    vfw.reference_function = ref_func
-
-    # ----- particle definition
-    ptc = SphericalParticle()
-    ptc.radius = 10e-6
-    ptc.medium_refractive_index = 1.33
-    ptc.refractive_index = 1.2667890
-
-    paramx = {'param': 'radius',
-              'start': 1e-6,
-              'stop': 200e-6,
-              'num': 20,}
-
-    X, F = ptc.geo_opt_force(beam=vfw, beam_pos=Point(3,22.1,0.01), force_dir='fy', paramx=paramx)
-
-    plt.plot(X, F)
-    plot.show()

@@ -34,8 +34,8 @@ SPEED_OF_LIGHT = 299792458
 VACUUM_PERMEABILITY = pi*4e-7
 
 def derivative(func, x0):
-    # Delta
-    h = 1e-9
+    '''# Delta
+    h = 1e-15
 
     # Denominator coefficient
     den = 840*h
@@ -44,7 +44,19 @@ def derivative(func, x0):
     lsp = [-4, -3, -2, -1, 0, 1, 2, 3, 4]
 
     # Finite Difference Coefficients
-    fdc = [3, -32, 168, -672, 0, 672, -168, 32, -3]
+    fdc = [3, -32, 168, -672, 0, 672, -168, 32, -3]'''
+
+    # Delta
+    h = 1e-15
+
+    # Denominator coefficient
+    den = 60*h
+
+    # Locations of Sampled Points
+    lsp = [-3, -2, -1, 0, 1, 2, 3]
+
+    # Finite Difference Coefficients
+    fdc = [-1, 9, -45, 0, 45, -9, 1]
 
     return np.dot(fdc, [func(x0+i*h) for i in lsp])/den
 
@@ -305,7 +317,7 @@ class Beam(object):
         """
 
         # k0 components
-        (x0, y0, z0) = Point(x1, x2, x3).cartesian()
+        (x0, y0, z0) = Point(x1, x2, x3, system).cartesian()
         psi = self.psi(x0, y0, z0, system)
         k0x = (derivative(lambda x: self.psi(x, y0, z0, system), x0)/psi).imag
         k0y = (derivative(lambda y: self.psi(x0, y, z0, system), y0)/psi).imag
@@ -329,6 +341,9 @@ class Beam(object):
                     k0z/np.linalg.norm(k))
         else:
             return (0, 0, 0)
+
+    def electric_field_direction(self, x1, x2, x3, system='cartesian'):
+        return [1, 0, 0]
 
 
 class ScalarPlaneWave(Beam):
@@ -1376,177 +1391,3 @@ class Point(object):
 
 if __name__ == "__main__":
     print("Please, visit: https://github.com/arantespp/opticalforces")
-
-    vbb0 = VectorialBesselBeam()
-    vbb0.wavelength = 1064e-9
-    vbb0.medium_refractive_index = 1.33
-    vbb0.amplitude = 5
-    vbb0.axicon_angle_degree = 10
-    vbb0.bessel_order = 3
-
-    vbb1 = VectorialBesselBeam()
-    vbb1.wavelength = 1064e-9
-    vbb1.medium_refractive_index = 1.33
-    vbb1.amplitude = 5
-    vbb1.axicon_angle_degree = 10
-    vbb1.bessel_order = 0
-
-    vbb2 = VectorialBesselBeam()
-    vbb2.wavelength = 1064e-9
-    vbb2.medium_refractive_index = 1.33
-    vbb2.amplitude = 1
-    vbb2.axicon_angle_degree = 15
-    vbb2.bessel_order = 2
-
-    sbb2 = ScalarBesselBeam()
-    sbb2.wavelength = 1064e-9
-    sbb2.medium_refractive_index = 1.33
-    sbb2.amplitude = 1
-    sbb2.axicon_angle_degree = 15
-    sbb2.bessel_order = 0
-
-    fw1 = VectorialFrozenWave()
-    fw1.vacuum_wavelength = 1064e-9
-    fw1.medium_refractive_index = 1.33
-    fw1.Q = 0.699*fw1.wavenumber
-    fw1.N = 15
-    #print(fw1.centered)
-
-    #vbb = vbb0 + vbb1 + vbb2
-
-    rho, phi, z = 0.03, 8, 0.01
-
-    #print(vbb2)
-
-    #Ex = vbb2.Ex(rho, phi, z, 'cylindrical')
-    #Ey = vbb2.Ey(x, y, z)
-    #Ez = vbb2.Ez(x, y, z)
-
-    print(vbb2)
-    print('Ex', vbb2.Ex(rho, phi, z, 'cylindrical'))
-    print('Ey', vbb2.Ey(rho, phi, z, 'cylindrical'))
-    print('Ez', vbb2.Ez(rho, phi, z, 'cylindrical'))
-    print('Hx', vbb2.Hx(rho, phi, z, 'cylindrical'))
-    print('Hy', vbb2.Hy(rho, phi, z, 'cylindrical'))
-    print('Hz', vbb2.Hz(rho, phi, z, 'cylindrical'))
-
-
-    #print(Ex0, Ex1)
-    #print(Ex0 + Ex1 + Ex2)
-    #print(vbb.Ex(x, y, z))
-
-    def ref_func(z):
-        if abs(z) < 0.35*0.1:
-            return ss.jv(0, 500*z)
-        else:
-            return 0
-
-    fw = ScalarFrozenWave()
-    fw.wavelength = 1064e-9
-    fw.medium_refractive_index = 1.33
-    fw.amplitude = 8
-    fw.phase = 3
-    fw.Q = 0.99*fw.wavenumber
-    fw.N = 3
-    fw.L = 0.1
-    fw.bessel_order = 0
-    #print(fw)
-    fw.reference_function = ref_func
-
-    #print(fw.psi(0.002*0,0,0.003*0))
-
-    vfw = VectorialFrozenWave()
-    vfw.wavelength = 1064e-9
-    vfw.medium_refractive_index = 1.33
-    vfw.Q = 0.99*vfw.wavenumber
-    vfw.N = 5
-    vfw.L = 0.1
-    vfw.reference_function = ref_func
-
-    #print(vfw.electric_field_direction(x, y, z))
-
-    '''vb = VectorialBeam()
-
-    b = ScalarPlaneWave()
-    b.wavelength = 1064e-9
-    b.medium_refractive_index = 1.33
-    b.amplitude = 5
-
-    vb.Ex = b.psi
-
-
-    print(b.psi(1.1, 0, 1.1))
-    print(vb.electric_field(1.1, 0, 1.1))'''
-
-    '''b = ScalarPlaneWave()
-    b.wavelength = 1064e-9
-    b.medium_refractive_index = 1.33
-    b.amplitude = 5
-
-    b2 = ScalarPlaneWave()
-    b2.wavelength = 1064e-9
-    b2.medium_refractive_index = 1.33
-    b2.phase = 3
-
-    bb = ScalarBesselBeam()
-    bb.wavelength = 1064e-9
-    bb.medium_refractive_index = 1.33
-    bb.phase = 1
-    bb.axicon_angle_degree = 10
-
-    bg = ScalarGaussianBeam()
-    bg.wavelength = 1064e-9
-    bg.medium_refractive_index = 1.33
-    bg.amplitude = 4
-    bg.phase = pi/10
-    bg.q = 2
-
-    bgb = ScalarBesselGaussBeam()
-    bgb.wavelength = 1064e-9
-    bgb.medium_refractive_index = 1.33
-    bgb.axicon_angle_degree = 10
-    bgb.amplitude = 3.1
-    bgb.phase = pi/7
-    bgb.q = 2
-
-    bgbs = ScalarBesselGaussBeamSuperposition()
-    bgbs.wavelength = 1064e-9
-    bgbs.medium_refractive_index = 1.33
-    bgbs.axicon_angle_degree = 10
-    bgbs.amplitude = 3.5
-    bgbs.phase = pi/4
-    bgbs.q = 0.01
-    bgbs.N = 4
-    bgbs.aperture_radius = 1e-3
-
-    def ref_func(z):
-        if abs(z) < 0.35*0.1:
-            return ss.jv(0, 500*z)
-        else:
-            return 0
-
-    fw = ScalarFrozenWave()
-    fw.wavelength = 1064e-9
-    fw.medium_refractive_index = 1.33
-    fw.amplitude = 3.5
-    fw.Q = 0.99*fw.wavenumber
-    fw.N = 3
-    fw.L = 0.1
-    fw.bessel_order = 1
-    print(fw)
-    fw.reference_function = ref_func
-
-    print(fw.psi(0.002*0,0,0.003*0))
-
-    c = b + b2 + bb + bg + bgb + bgbs + fw
-    #c = fw
-    c.amplitude = 3
-    print(c)
-    print(c.psi(0, 0, 0.001))
-    print(c.psi(0.01, pi, 0.01, 'cylindrical'))
-    print(c.psi(0.01, pi, 0.01, 'spherical'))
-    print(c.wavenumber_direction(0.0001, pi, 0.02, 'spherical'))
-    print(c.wavenumber_direction(0.0001, pi, 0.02, 'cylindrical'))
-    '''
-    #a = (ref_func, 2)
-    #print(a)
