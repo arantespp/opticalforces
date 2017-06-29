@@ -4,7 +4,7 @@ import cmath as cm
 from numbers import Number
 from functools import wraps
 import time
-from scipy.integrate import quad
+from scipy.integrate import quad, dblquad
 import copy
 import pandas as pd
 import numpy as np
@@ -12,11 +12,11 @@ import os
 
 from beam import Point
 
-import pyperclip
-
 
 # Speed of light.
 SPEED_OF_LIGHT = 299792458
+
+k0time = []
 
 
 def round_sig(num, sig=4):
@@ -35,7 +35,7 @@ def round_sig(num, sig=4):
 def check_geo_opt_database(func):
     @wraps(func)
     def wrapped(self, beam, beam_pos, force_dir, force_type='total',
-                paramx=None, paramy=None):
+                paramx=None, paramy=None, epsrel=5e-2):
 
         database_name = '_'.join([self.name, beam.name, 'geo-opt.pkl'])
         database_dir = 'database'
@@ -44,11 +44,19 @@ def check_geo_opt_database(func):
         if not os.path.isdir(database_dir):
             os.makedirs(database_dir)
 
+        if len(beam_pos) == 3:
+            beam_pos = Point(beam_pos[0], beam_pos[1], beam_pos[2])
+        elif len(beam_pos) == 4:
+            beam_pos = Point(beam_pos[0], beam_pos[1], beam_pos[2], beam_pos[3])
+        else:
+            raise ValueError('beam_pos parameters wrong')
+
         # params without force
         params = {'beam_pos_x': round_sig(beam_pos.x),
                   'beam_pos_y': round_sig(beam_pos.y),
                   'beam_pos_z': round_sig(beam_pos.z),
-                  'force_type': force_type,}
+                  'force_type': force_type,
+                  'epsrel': epsrel,}
 
         for param in self.params:
             params.update({param[1:]: round_sig(self.__dict__[param])})
@@ -79,7 +87,8 @@ def check_geo_opt_database(func):
                               params['beam_pos_z'],)
 
             if dff.empty:
-                force = func(self, beam, _beam_pos, force_dir, force_type)
+                force = func(self, beam, _beam_pos, force_dir, force_type,
+                             epsrel)
                 _params = params.copy()
                 _params[force_dir] = force
                 df = df.append(_params, ignore_index=True)
@@ -87,7 +96,8 @@ def check_geo_opt_database(func):
                 df.to_pickle(database_full_path)
             else:
                 if np.isnan(dff.loc[dff.index[0], force_dir]):
-                    force = func(self, beam, _beam_pos, force_dir, force_type)
+                    force = func(self, beam, _beam_pos, force_dir, force_type,
+                                 epsrel)
                     df = df.set_value(dff.index[0], force_dir, force)
                     df.to_csv(database_full_path[:-3] + 'csv', index=False)
                     df.to_pickle(database_full_path)
@@ -165,6 +175,7 @@ def check_geo_opt_database(func):
                 _params = params.copy()
 
                 for idx in range(_df.shape[0]):
+
                     if pd.notnull(_df[force_dir][idx]):
                         continue
 
@@ -172,15 +183,15 @@ def check_geo_opt_database(func):
 
                     nnan_cur = _df[force_dir].isnull().sum()
 
-                    print('%d/%d'% (nnan_init-nnan_cur+1, nnan_init), end='\n')
-                    print('start:', time.strftime("%d %b %Y %H:%M:%S",
-                          time.localtime()), end='\n')
+                    print('%d/%d'% (nnan_init-nnan_cur+1, nnan_init))
+                    print('start: ' + str(time.strftime('%d %b %Y %H:%M:%S',
+                                                        time.localtime())))
 
                     time0 = time.time()
 
                     _df[force_dir][idx] = get_force_from_params(_params)
 
-                    print('time:', time.time() - time0, end='\n')
+                    print('time: ' + str(time.time() - time0) + '\n')
 
             return _df[param].values.tolist(), _df[force_dir].values.tolist()
 
@@ -262,7 +273,8 @@ class SphericalParticle(object):
         elif theta == pi:
             return [0, 0, -1]
         else:
-            return [ma.sin(theta)*ma.cos(phi), ma.sin(theta)*ma.sin(phi),
+            return [ma.sin(theta)*ma.cos(phi),
+                    ma.sin(theta)*ma.sin(phi),
                     ma.cos(theta)]
 
     @staticmethod
@@ -373,7 +385,7 @@ class SphericalParticle(object):
                        * cm.exp(+2j*refracted_angle)))
 
     @check_geo_opt_database
-    def geo_opt_force(self, beam, beam_pos, force_dir, force_type):
+    def geo_opt_force(self, beam, beam_pos, force_dir, force_type, epsrel):
         """ Force that beam causes in a spherical particle in a deter-
         mined position in geometrical optics regime (particle radius is
         greater than 10 times beam's wavelenght).
@@ -388,6 +400,9 @@ class SphericalParticle(object):
         def dforce(theta, phi):
             # Beam particle surface: beam coordinates point that
             # match the point at theta and phi on particle surface.
+
+            #t0 = time.time()
+
             bps = Point(self.radius, theta, phi, 'spherical') - beam_pos
 
             _rho, _phi, _z = bps.cylindrical()
@@ -426,6 +441,9 @@ class SphericalParticle(object):
             _dforce = [(Qt.real*k + Qt.imag*d)*self._medium_refractive_index
                        * dpower/SPEED_OF_LIGHT for k, d in zip(k0, d0)]
 
+            #k0time.append(time.time()-t0)
+            #print('k0: ', np.mean(k0time))
+
             if force_dir == 'fx':
                 return _dforce[0]
             elif force_dir == 'fy':
@@ -436,22 +454,23 @@ class SphericalParticle(object):
                 return 0
 
         def quad_integration():
-            epsrel = 1e-3
-            epsabs = 1e-18
-            limit = 999
-
             def theta_integral(phi):
                 val, err = quad(lambda theta: dforce(theta, phi)*ma.sin(theta),
-                                0, pi, epsabs=epsabs, epsrel=epsrel,
-                                limit=limit)
+                                0, pi, epsabs=0, epsrel=epsrel)
                 return val
 
-            val, err = quad(theta_integral, 0, 2*pi, epsabs=epsabs, limit=limit,
-                            epsrel=epsrel)
+            val, err = quad(theta_integral, 0, 2*pi, epsabs=0, epsrel=epsrel)
 
             return val
 
-        return quad_integration()
+        def dblquad_integration():
+            val, err = dblquad(lambda th, ph: dforce(th, ph)*ma.sin(th),
+                               0, 2*pi, lambda ph: 0, lambda ph: pi,
+                               epsabs=0, epsrel=epsrel)
+
+            return val
+
+        return dblquad_integration()
 
 
 if __name__ == '__main__':

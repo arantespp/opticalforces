@@ -34,8 +34,8 @@ SPEED_OF_LIGHT = 299792458
 VACUUM_PERMEABILITY = pi*4e-7
 
 def derivative(func, x0):
-    '''# Delta
-    h = 1e-15
+    # Delta
+    h = 1e-9
 
     # Denominator coefficient
     den = 840*h
@@ -44,10 +44,10 @@ def derivative(func, x0):
     lsp = [-4, -3, -2, -1, 0, 1, 2, 3, 4]
 
     # Finite Difference Coefficients
-    fdc = [3, -32, 168, -672, 0, 672, -168, 32, -3]'''
+    fdc = [3, -32, 168, -672, 0, 672, -168, 32, -3]
 
     # Delta
-    h = 1e-15
+    '''h = 1e-9
 
     # Denominator coefficient
     den = 60*h
@@ -56,7 +56,7 @@ def derivative(func, x0):
     lsp = [-3, -2, -1, 0, 1, 2, 3]
 
     # Finite Difference Coefficients
-    fdc = [-1, 9, -45, 0, 45, -9, 1]
+    fdc = [-1, 9, -45, 0, 45, -9, 1]'''
 
     return np.dot(fdc, [func(x0+i*h) for i in lsp])/den
 
@@ -336,14 +336,12 @@ class Beam(object):
         # normalize k0 vector
         if k0x != 0 or k0y != 0 or k0z != 0:
             k = [k0x, k0y, k0z]
-            return (k0x/np.linalg.norm(k),
-                    k0y/np.linalg.norm(k),
-                    k0z/np.linalg.norm(k))
-        else:
-            return (0, 0, 0)
+            absk = np.linalg.norm(k)
+            return (k0x/absk, k0y/absk, k0z/absk)
+        return (0, 0, 0)
 
     def electric_field_direction(self, x1, x2, x3, system='cartesian'):
-        return [1, 0, 0]
+        return [0, 1, 0]
 
 
 class ScalarPlaneWave(Beam):
@@ -842,9 +840,9 @@ class ScalarBesselGaussBeamSuperposition(ScalarBesselGaussBeam):
             beam.q = (self.qr - 1j*2*pi*n_index/self.L)
             self.beams.append(beam)
 
-    def psi(self, x1, x2, x3, system='cartesian'):
-        return (self._amplitude*cm.exp(1j*self._phase)
-                *sum([beam.psi(x1, x2, x3, system) for beam in self.beams]))
+    #def psi(self, x1, x2, x3, system='cartesian'):
+    #    return (self._amplitude*cm.exp(1j*self._phase)
+    #            *sum([beam.psi(x1, x2, x3, system) for beam in self.beams]))
 
 
 class ScalarFrozenWave(Beam):
@@ -967,10 +965,10 @@ class ScalarFrozenWave(Beam):
             self.beams.append(beam)
             #self.amplitudes.append(amplitude_n(n_index))
 
-    #def psi(self, x1, x2, x3, system='cartesian'):
-    #    return (self._amplitude*cm.exp(1j*self._phase)
-    #            *sum([beam.psi(x1, x2, x3, system)
-    #                 for beam in self.beams]))
+    def psi(self, x1, x2, x3, system='cartesian'):
+        return (self._amplitude*cm.exp(1j*self._phase)
+                *sum([beam.psi(x1, x2, x3, system)
+                     for beam in self.beams]))
 
 
 class VectorialBeam(Beam):
