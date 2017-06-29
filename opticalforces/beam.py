@@ -829,7 +829,7 @@ class ScalarBesselGaussBeamSuperposition(ScalarBesselGaussBeam):
             if den != 0:
                 return cm.sinh(arg)/den
             elif den == 0 and arg == 0:
-                return 0.5
+                return 2*self.R**2/self.L
             else:
                 return 0
 
