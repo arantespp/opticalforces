@@ -286,8 +286,7 @@ class Beam(object):
 
     def psi(self, x1, x2, x3, system='cartesian'):
         return (self._amplitude*cm.exp(1j*self._phase)
-                *sum([beam.psi(x1, x2, x3, system)
-                     for beam in self.beams]))
+                *sum([beam.psi(x1, x2, x3, system) for beam in self.beams]))
 
     def intensity(self, x1, x2, x3, system='cartesian'):
         """ Wave's intensity.
@@ -685,7 +684,7 @@ class ScalarBesselGaussBeamSuperposition(ScalarBesselGaussBeam):
 
     intrinsic_params += ('_N',
                          '_zmax',
-                         '_aperture_radius',
+                         '_R',
                          '_L',
                          '_qr')
 
@@ -699,7 +698,7 @@ class ScalarBesselGaussBeamSuperposition(ScalarBesselGaussBeam):
 
         self._N = None
         self._zmax = None
-        self._aperture_radius = None
+        self._R = None
         self._L = None
         self._qr = None
 
@@ -743,30 +742,31 @@ class ScalarBesselGaussBeamSuperposition(ScalarBesselGaussBeam):
     def zmax(self, value):
         self._zmax = value
 
-        if (self.axicon_angle is None
-                and self.aperture_radius is not None):
-            self.axicon_angle = ma.atan(self.aperture_radius/self.zmax)
+        if (self.axicon_angle is None and self.R is not None):
+            self.axicon_angle = ma.atan(self.R/self.zmax)
 
-        if (self.axicon_angle is not None
-                and self.aperture_radius is None):
-            self.aperture_radius = (self.zmax*ma.tan(self.axicon_angle))
+        if (self.axicon_angle is not None and self.R is None):
+            self.R = (self.zmax*ma.tan(self.axicon_angle))
 
         self.__create_superposition()
 
     @property
-    def aperture_radius(self):
-        return self._aperture_radius
+    def R(self):
+        return self._R
 
-    @aperture_radius.setter
-    def aperture_radius(self, value):
-        self._aperture_radius = value
+    @R.setter
+    def R(self, value):
+        self._R = value
         self.L = 3*value**2
 
         if self.axicon_angle is None and self.zmax is not None:
             self.axicon_angle = ma.atan(value/self.zmax)
 
         if self.axicon_angle is not None and self.zmax is None:
-            self.zmax = value/ma.tan(self.axicon_angle)
+            if self.axicon_angle == 0:
+                self.zmax = ma.inf
+            else:
+                self.zmax = value/ma.tan(self.axicon_angle)
 
         self.__create_superposition()
 
@@ -789,11 +789,11 @@ class ScalarBesselGaussBeamSuperposition(ScalarBesselGaussBeam):
             if theta != 0:
                 self.wavenumber = krho/ma.sin(theta)
 
-        if self.zmax is None and self.aperture_radius is not None:
-            self.zmax = self.aperture_radius/ma.tan(theta)
+        if self.zmax is None and self.R is not None:
+            self.zmax = self.R/ma.tan(theta)
 
-        if self.zmax is not None and self.aperture_radius is None:
-            self.aperture_radius = self.zmax*ma.tan(theta)
+        if self.zmax is not None and self.R is None:
+            self.R = self.zmax*ma.tan(theta)
 
         if self.wavenumber is not None:
             self.wavenumber = self.wavenumber
@@ -824,9 +824,14 @@ class ScalarBesselGaussBeamSuperposition(ScalarBesselGaussBeam):
             return
 
         def amplitude_n(n):
-            arg = (self.qr - self.q - 2j*pi*n/self.L)*self.aperture_radius**2
+            arg = (self.qr - self.q - 2j*pi*n/self.L)*self.R**2
             den = self.L*(self.qr-self.q)/2 - 1j*pi*n
-            return cm.sinh(arg)/den
+            if den != 0:
+                return cm.sinh(arg)/den
+            elif den == 0 and arg == 0:
+                return 0.5
+            else:
+                return 0
 
         self.beams = []
 
@@ -840,9 +845,8 @@ class ScalarBesselGaussBeamSuperposition(ScalarBesselGaussBeam):
             beam.q = (self.qr - 1j*2*pi*n_index/self.L)
             self.beams.append(beam)
 
-    #def psi(self, x1, x2, x3, system='cartesian'):
-    #    return (self._amplitude*cm.exp(1j*self._phase)
-    #            *sum([beam.psi(x1, x2, x3, system) for beam in self.beams]))
+    def psi(self, x1, x2, x3, system='cartesian'):
+        return Beam.psi(self, x1, x2, x3, system='cartesian')
 
 
 class ScalarFrozenWave(Beam):
@@ -967,8 +971,7 @@ class ScalarFrozenWave(Beam):
 
     def psi(self, x1, x2, x3, system='cartesian'):
         return (self._amplitude*cm.exp(1j*self._phase)
-                *sum([beam.psi(x1, x2, x3, system)
-                     for beam in self.beams]))
+                *sum([beam.psi(x1, x2, x3, system) for beam in self.beams]))
 
 
 class VectorialBeam(Beam):
@@ -1389,3 +1392,13 @@ class Point(object):
 
 if __name__ == "__main__":
     print("Please, visit: https://github.com/arantespp/opticalforces")
+
+    bgbs = ScalarBesselGaussBeamSuperposition()
+    bgbs.wavelength = 632.8e-9
+    bgbs.medium_refractive_index = 1
+    bgbs.transversal_wavenumber = 4.07e4
+    bgbs.q = 0
+    bgbs.N = 23
+    bgbs.R = 3.5e-3
+    print(bgbs.psi(0.001, 0, 0))
+
