@@ -380,6 +380,7 @@ class ScalarPlaneWave(Beam):
 class ScalarBesselBeam(Beam):
     intrinsic_params = ('_longitudinal_wavenumber',
                         '_transversal_wavenumber',
+                        '_bessel_spot',
                         '_axicon_angle',
                         '_axicon_angle_degree',
                         '_bessel_order',)
@@ -394,9 +395,13 @@ class ScalarBesselBeam(Beam):
 
         self._transversal_wavenumber = None
         self._longitudinal_wavenumber = None
+        self._bessel_spot = None
         self._axicon_angle = None
         self._axicon_angle_degree = None
         self._bessel_order = 0
+
+        # use to determine which variable was setted first
+        self.spot_krho_first = None
 
         for key, value in kwargs.items():
             if hasattr(self, '_' + key):
@@ -476,6 +481,7 @@ class ScalarBesselBeam(Beam):
     @transversal_wavenumber.setter
     def transversal_wavenumber(self, krho):
         self._transversal_wavenumber = krho
+        self._bessel_spot = ss.jn_zeros(self.bessel_order, 1)[0]/krho
 
         if self.longitudinal_wavenumber is not None:
             kz = self.longitudinal_wavenumber
@@ -490,11 +496,24 @@ class ScalarBesselBeam(Beam):
             self.wavenumber = self.wavenumber
 
     @property
+    def bessel_spot(self):
+        return self._bessel_spot
+
+    @bessel_spot.setter
+    def bessel_spot(self, value):
+        print('bessel_spot variable cannot be setted')
+
+    @property
     def axicon_angle(self):
         return self._axicon_angle
 
     @axicon_angle.setter
     def axicon_angle(self, theta):
+        if theta < 0:
+            raise ValueError('theta value error: it is negative')
+        if theta > pi/2:
+            raise ValueError('theta value error: it is greater than pi/2')
+
         self._axicon_angle = theta
         self._axicon_angle_degree = 180*theta/pi
 
@@ -527,6 +546,7 @@ class ScalarBesselBeam(Beam):
     @bessel_order.setter
     def bessel_order(self, value):
         self._bessel_order = value
+        self._bessel_spot = ss.jn_zeros(value,1)[0]/self.transversal_wavenumber
 
     def psi(self, x1, x2, x3, system='cartesian'):
         if system == 'cylindrical':
@@ -1400,5 +1420,12 @@ if __name__ == "__main__":
     bgbs.q = 0
     bgbs.N = 23
     bgbs.R = 3.5e-3
-    print(bgbs.psi(0.001, 0, 0))
 
+    bb = ScalarBesselBeam()
+    bb.wavelength = 1064e-9
+    bb.medium_refractive_index = 1.33
+    bb.axicon_angle_degree = 100
+    bb.bessel_order = 0
+    print(bb)
+
+    #print(ss.jn_zeros(1, 1)[0])
