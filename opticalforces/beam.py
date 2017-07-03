@@ -144,13 +144,15 @@ class Beam(object):
         beams = []
 
         for beam in self.beams:
-            beam._amplitude *= self._amplitude
-            beam._phase += self._phase
+            if len(self.beams) > 1:
+                beam._amplitude *= self._amplitude
+                beam._phase += self._phase
             beams.append(copy.copy(beam))
 
         for beam in other.beams:
-            beam._amplitude *= other._amplitude
-            beam._phase += other._phase
+            if len(other.beams) > 1:
+                beam._amplitude *= other._amplitude
+                beam._phase += other._phase
             beams.append(copy.copy(beam))
 
         return Beam(beams)
@@ -1012,13 +1014,15 @@ class VectorialBeam(Beam):
         # effetuate the sum because all generic params are equal.
         beams = []
         for beam in self.beams:
-            beam._amplitude *= self._amplitude
-            beam._phase += self._phase
+            if len(self.beams) > 1:
+                beam._amplitude *= self._amplitude
+                beam._phase += self._phase
             beams.append(copy.copy(beam))
 
         for beam in other.beams:
-            beam._amplitude *= other._amplitude
-            beam._phase += other._phase
+            if len(other.beams) > 1:
+                beam._amplitude *= other._amplitude
+                beam._phase += other._phase
             beams.append(copy.copy(beam))
 
         return VectorialBeam(beams)
@@ -1424,8 +1428,31 @@ if __name__ == "__main__":
     bb = ScalarBesselBeam()
     bb.wavelength = 1064e-9
     bb.medium_refractive_index = 1.33
-    bb.axicon_angle_degree = 100
+    bb.axicon_angle_degree = 10
     bb.bessel_order = 0
-    print(bb)
+
+    bb2 = ScalarBesselBeam()
+    bb2.wavelength = 1064e-9
+    bb2.medium_refractive_index = 1.33
+    bb2.axicon_angle_degree = 11
+    bb2.bessel_order = 0
+    bb2.amplitude = 3
+
+    bb3 = ScalarBesselBeam()
+    bb3.wavelength = 1064e-9
+    bb3.medium_refractive_index = 1.33
+    bb3.axicon_angle_degree = 13
+    bb3.bessel_order = 0
+    bb3.amplitude = 3
+
+    BB = bb + bb2
+
+    BB.amplitude = 5
+
+    print(BB)
+
+    BB2 = BB + bb3
+
+    print(BB2)
 
     #print(ss.jn_zeros(1, 1)[0])
