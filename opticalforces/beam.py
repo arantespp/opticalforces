@@ -867,9 +867,6 @@ class ScalarBesselGaussBeamSuperposition(ScalarBesselGaussBeam):
             beam.q = (self.qr - 1j*2*pi*n_index/self.L)
             self.beams.append(beam)
 
-    def psi(self, x1, x2, x3, system='cartesian'):
-        return Beam.psi(self, x1, x2, x3, system='cartesian')
-
 
 class ScalarFrozenWave(Beam):
     intrinsic_params = ('_Q',
@@ -942,7 +939,7 @@ class ScalarFrozenWave(Beam):
     @reference_function.setter
     def reference_function(self, func):
         self.func = func
-        self._reference_function = 'Already defined (name: %s)' % func.__name__
+        self._reference_function = '%s' % func.__name__
         self.__create_superposition()
 
     def __create_superposition(self):
@@ -950,8 +947,8 @@ class ScalarFrozenWave(Beam):
             return
 
         def amplitude_n(n):
-            func_real = lambda z: (self.func(z)*cm.exp(-2j*pi*z*n/self.L)).real
-            func_imag = lambda z: (self.func(z)*cm.exp(-2j*pi*z*n/self.L)).imag
+            func_real = lambda z: (self.func(z)*cm.exp(+2j*pi*z*n/self.L)).real
+            func_imag = lambda z: (self.func(z)*cm.exp(+2j*pi*z*n/self.L)).imag
             if self.centered:
                 an_real, err = quad(func_real, -self.L/2, self.L/2)
                 an_imag, err = quad(func_imag, -self.L/2, self.L/2)
@@ -1050,20 +1047,25 @@ class VectorialBeam(Beam):
     def electric_field(self, x1, x2, x3, system='cartesian'):
         return self.E(x1, x2, x3, system)
 
+    def Hx(self, x1, x2, x3, system='cartesian'):
+        return (self._amplitude*cm.exp(1j*self._phase)
+                *sum([beam.Hx(x1, x2, x3, system)
+                    for beam in self.beams]))
+
+    def Hy(self, x1, x2, x3, system='cartesian'):
+        return (self._amplitude*cm.exp(1j*self._phase)
+                *sum([beam.Hy(x1, x2, x3, system)
+                    for beam in self.beams]))
+
+    def Hz(self, x1, x2, x3, system='cartesian'):
+        return (self._amplitude*cm.exp(1j*self._phase)
+                *sum([beam.Hz(x1, x2, x3, system)
+                    for beam in self.beams]))
+
     def H(self, x1, x2, x3, system='cartesian'):
-        Hx = (self._amplitude*cm.exp(1j*self._phase)
-              *sum([beam.Hx(x1, x2, x3, system)
-                    for beam in self.beams]))
-
-        Hy = (self._amplitude*cm.exp(1j*self._phase)
-              *sum([beam.Hy(x1, x2, x3, system)
-                    for beam in self.beams]))
-
-        Hz = (self._amplitude*cm.exp(1j*self._phase)
-              *sum([beam.Hz(x1, x2, x3, system)
-                    for beam in self.beams]))
-
-        return (Hx, Hy, Hz)
+        return (self.Hx(x1, x2, x3, system),
+                self.Hy(x1, x2, x3, system),
+                self.Hz(x1, x2, x3, system),)
 
     def magnetic_field(self, x1, x2, x3, system='cartesian'):
         return self.H(x1, x2, x3, system)
@@ -1073,14 +1075,16 @@ class VectorialBeam(Beam):
         return abs(Ex)**2 + abs(Ey)**2 + abs(Ez)**2
 
     def electric_field_direction(self, x1, x2, x3, system='cartesian'):
-        E0 = self.E(x1, x2, x3, system)
+        E0 = [E.real for E in self.E(x1, x2, x3, system)]
         E0_abs = np.linalg.norm(E0)
-        return [abs(E)/E0_abs for E in E0]
+        return [E/E0_abs for E in E0]
 
     def wavenumber_direction(self, x1, x2, x3, system='cartesian'):
-        wdir = np.cross(self.E(x1, x2, x3, system), self.H(x1, x2, x3, system))
+        wdir = np.cross(self.E(x1, x2, x3, system),
+                        np.conjugate(self.H(x1, x2, x3, system)))
+        wdir = [wd.real for wd in wdir]
         wdir_abs = np.linalg.norm(wdir)
-        return [abs(k)/wdir_abs for k in wdir]
+        return [wd/wdir_abs for wd in wdir]
 
 
 class VectorialBesselBeam(ScalarBesselBeam, VectorialBeam):
@@ -1206,6 +1210,9 @@ class VectorialBesselBeam(ScalarBesselBeam, VectorialBeam):
                                  +cm.exp(-1j*phi)
                                   *ss.jv(ni-1, krho*rho))))
 
+    def intensity(self, x1, x2, x3, system='cartesian'):
+        return super(VectorialBeam, self).intensity(x1, x2, x3, system)
+
 
 class VectorialFrozenWave(VectorialBeam):
     intrinsic_params = ('_Q',
@@ -1279,7 +1286,7 @@ class VectorialFrozenWave(VectorialBeam):
     @reference_function.setter
     def reference_function(self, func):
         self.func = func
-        self._reference_function = 'Already defined (name: %s)' % func.__name__
+        self._reference_function = '%s' % func.__name__
         self.__create_superposition()
 
     def __create_superposition(self):
@@ -1287,8 +1294,8 @@ class VectorialFrozenWave(VectorialBeam):
             return
 
         def amplitude_n(n):
-            func_real = lambda z: (self.func(z)*cm.exp(-2j*pi*z*n/self.L)).real
-            func_imag = lambda z: (self.func(z)*cm.exp(-2j*pi*z*n/self.L)).imag
+            func_real = lambda z: (self.func(z)*cm.exp(+2j*pi*z*n/self.L)).real
+            func_imag = lambda z: (self.func(z)*cm.exp(+2j*pi*z*n/self.L)).imag
 
             if self.centered:
                 an_real, err = quad(func_real, -self.L/2, self.L/2)
@@ -1417,42 +1424,54 @@ class Point(object):
 if __name__ == "__main__":
     print("Please, visit: https://github.com/arantespp/opticalforces")
 
-    bgbs = ScalarBesselGaussBeamSuperposition()
-    bgbs.wavelength = 632.8e-9
-    bgbs.medium_refractive_index = 1
-    bgbs.transversal_wavenumber = 4.07e4
-    bgbs.q = 0
-    bgbs.N = 23
-    bgbs.R = 3.5e-3
+    from particle import SphericalParticle
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d import Axes3D
+    from matplotlib import cm as cmplt
 
-    bb = ScalarBesselBeam()
-    bb.wavelength = 1064e-9
-    bb.medium_refractive_index = 1.33
-    bb.axicon_angle_degree = 10
-    bb.bessel_order = 0
+    L = 1e-3
 
-    bb2 = ScalarBesselBeam()
-    bb2.wavelength = 1064e-9
-    bb2.medium_refractive_index = 1.33
-    bb2.axicon_angle_degree = 11
-    bb2.bessel_order = 0
-    bb2.amplitude = 3
+    #def ref_func(z):
+    #    if z >= 0.2*L and z <= 0.5*L:
+    #        return sin()
 
-    bb3 = ScalarBesselBeam()
-    bb3.wavelength = 1064e-9
-    bb3.medium_refractive_index = 1.33
-    bb3.axicon_angle_degree = 13
-    bb3.bessel_order = 0
-    bb3.amplitude = 3
+    def ref_func(z):
+        return 1 if abs(z) < 0.1*L else 0
 
-    BB = bb + bb2
+    vfw = VectorialFrozenWave(centered=True)
+    vfw.vacuum_wavelength = 1064e-9
+    vfw.medium_refractive_index = 1.33
+    vfw.N = 15
+    vfw.L = L
+    vfw.Q = 0.95*vfw.wavenumber
+    vfw.reference_function = ref_func
+    #vfw.electric_field_direction = lambda x1, x2, x3, sys: [1, 0, 0]
 
-    BB.amplitude = 5
+    ptc = SphericalParticle()
+    ptc.radius = 17.5e-6
+    ptc.medium_refractive_index = 1.33
 
-    print(BB)
+    beam_pos = (0, 0, 0)
 
-    BB2 = BB + bb3
+    paramx = {'param': 'beam_pos_z',
+              'start': -3*L/10,
+              'stop': 3*L/10,
+              'num': 40,}
 
-    print(BB2)
+    ptc.refractive_index = 1.2*1.33
+    X1, F1 = ptc.geo_opt_force(vfw, beam_pos, force_dir='fz', paramx=paramx)
+    plt.plot(X1, [1*f for f in F1], label=r'n$_{text{rel}}$: %s' % str(ptc.refractive_index/1.33))
 
-    #print(ss.jn_zeros(1, 1)[0])
+    ptc.refractive_index = 1.01*1.33
+    X2, F2 = ptc.geo_opt_force(vfw, beam_pos, force_dir='fz', paramx=paramx)
+    plt.plot(X2, [5*f for f in F2], label=r'n$_{text{rel}}$: %s' % str(ptc.refractive_index/1.33))
+
+    ptc.refractive_index = 1.005*1.33
+    X3, F3 = ptc.geo_opt_force(vfw, beam_pos, force_dir='fz', paramx=paramx)
+    plt.plot(X3, [10*f for f in F3], label=r'n$_{text{rel}}$: %s' % str(ptc.refractive_index/1.33))
+
+    ptc.refractive_index = 0.95*1.33
+    X4, F4 = ptc.geo_opt_force(vfw, beam_pos, force_dir='fz', paramx=paramx)
+    plt.plot(X4, [1*f for f in F4], label=r'n$_{text{rel}}$: %s' % str(ptc.refractive_index/1.33))
+
+    plt.show()
