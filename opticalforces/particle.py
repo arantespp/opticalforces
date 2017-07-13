@@ -35,7 +35,7 @@ def round_sig(num, sig=4):
 def check_geo_opt_database(func):
     @wraps(func)
     def wrapped(self, beam, beam_pos, force_dir, force_type='total',
-                paramx=None, paramy=None, epsrel=5e-2):
+                paramx=None, paramy=None, epsrel=10/100):
 
         database_name = '_'.join([self.name, beam.name, 'geo-opt.pkl'])
         database_dir = 'database'
@@ -58,8 +58,18 @@ def check_geo_opt_database(func):
                   'force_type': force_type,
                   'epsrel': epsrel,}
 
+        # particle params
         for param in self.params:
             params.update({param[1:]: round_sig(self.__dict__[param])})
+
+        # beam params
+        for param in beam.params:
+            if isinstance(beam.__dict__[param], str):
+                val = beam.__dict__[param]
+            else:
+                val = round_sig(beam.__dict__[param])
+
+            params.update({param[1:]: val})
 
         def get_force_from_params(params):
             # load a dataframe or create if it doesn't exist
@@ -476,3 +486,26 @@ class SphericalParticle(object):
 if __name__ == '__main__':
     print("Please, visit: https://github.com/arantespp/opticalforces")
 
+    from beam import ScalarBesselGaussBeamSuperposition, Point
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d import Axes3D
+    from matplotlib import cm as cmplt
+
+    tbb = ScalarBesselGaussBeamSuperposition(medium_refractive_index=1.33,
+                                             vacuum_wavelength=1064e-9)
+    tbb.R = 1e-3
+    tbb.q = 0
+    tbb.N = 21
+    tbb.axicon_angle_degree = 6
+
+    #z = np.linspace(0, 1.25*tbb.zmax, 251)
+
+    #plt.plot(z, [tbb.intensity(0, 0, z) for z in z])
+    #plt.show()
+
+    ptc = SphericalParticle(medium_refractive_index=1.33)
+    ptc.refractive_index = 1.2
+    ptc.radius = 18e-6
+    ptc.absorption_coefficient = 0
+
+    print(ptc.geo_opt_force(tbb, Point(0, 0, -0.5*1e-3), 'fz', 'reflection', 1e-2))
