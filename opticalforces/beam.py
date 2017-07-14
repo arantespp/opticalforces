@@ -947,8 +947,8 @@ class ScalarFrozenWave(Beam):
             return
 
         def amplitude_n(n):
-            func_real = lambda z: (self.func(z)*cm.exp(+2j*pi*z*n/self.L)).real
-            func_imag = lambda z: (self.func(z)*cm.exp(+2j*pi*z*n/self.L)).imag
+            func_real = lambda z: (self.func(z)*cm.exp(-2j*pi*z*n/self.L)).real
+            func_imag = lambda z: (self.func(z)*cm.exp(-2j*pi*z*n/self.L)).imag
             if self.centered:
                 an_real, err = quad(func_real, -self.L/2, self.L/2)
                 an_imag, err = quad(func_imag, -self.L/2, self.L/2)
@@ -1121,7 +1121,7 @@ class VectorialBesselBeam(ScalarBesselBeam, VectorialBeam):
         kz, krho, ni, alpha = self.__some_params()
 
         return (self._amplitude*cm.exp(1j*self._phase)
-                *0.25*(1+ma.cos(alpha))*(-1j)**ni*cm.exp(-1j*kz*z)
+                *0.25*(1+ma.cos(alpha))*(-1j)**ni*cm.exp(+1j*kz*z)
                 *(+(1+ma.cos(alpha))*ss.jv(ni, krho*rho)
                   +0.5*(1-ma.cos(alpha))*(+cm.exp(+2j*phi)
                                            *ss.jv(ni+2, krho*rho)
@@ -1137,7 +1137,7 @@ class VectorialBesselBeam(ScalarBesselBeam, VectorialBeam):
         kz, krho, ni, alpha = self.__some_params()
 
         return (self._amplitude*cm.exp(1j*self._phase)
-                *0.25*(1+ma.cos(alpha))*(-1j)**ni*cm.exp(-1j*kz*z)
+                *0.25*(1+ma.cos(alpha))*(-1j)**ni*cm.exp(+1j*kz*z)
                 *(-0.5j*(1-ma.cos(alpha))*(+cm.exp(+2j*phi)
                                             *ss.jv(ni+2, krho*rho)
                                            -cm.exp(-2j*phi)
@@ -1152,7 +1152,7 @@ class VectorialBesselBeam(ScalarBesselBeam, VectorialBeam):
         kz, krho, ni, alpha = self.__some_params()
 
         return (self._amplitude*cm.exp(1j*self._phase)
-                *0.25*(1+ma.cos(alpha))*(-1j)**ni*cm.exp(-1j*kz*z)
+                *0.25*(1+ma.cos(alpha))*(-1j)**ni*cm.exp(+1j*kz*z)
                 *(+1j*ma.sin(alpha)*(+cm.exp(+1j*phi)
                                       *ss.jv(ni+1, krho*rho)
                                      -cm.exp(-1j*phi)
@@ -1169,7 +1169,7 @@ class VectorialBesselBeam(ScalarBesselBeam, VectorialBeam):
         const = SPEED_OF_LIGHT*VACUUM_PERMEABILITY
 
         return (self._amplitude*cm.exp(1j*self._phase)/const
-                *0.25*(1+ma.cos(alpha))*(-1j)**ni*cm.exp(-1j*kz*z)
+                *0.25*(1+ma.cos(alpha))*(-1j)**ni*cm.exp(+1j*kz*z)
                 *(-0.5j*(1-ma.cos(alpha))*(+cm.exp(+2j*phi)
                                             *ss.jv(ni+2, krho*rho)
                                            -cm.exp(-2j*phi)
@@ -1186,7 +1186,7 @@ class VectorialBesselBeam(ScalarBesselBeam, VectorialBeam):
         const = SPEED_OF_LIGHT*VACUUM_PERMEABILITY
 
         return (self._amplitude*cm.exp(1j*self._phase)/const
-                *0.25*(1+ma.cos(alpha))*(-1j)**ni*cm.exp(-1j*kz*z)
+                *0.25*(1+ma.cos(alpha))*(-1j)**ni*cm.exp(+1j*kz*z)
                 *(+(1+ma.cos(alpha))*ss.jv(ni, krho*rho)
                   -0.5*(1-ma.cos(alpha))*(+cm.exp(+2j*phi)
                                            *ss.jv(ni+2, krho*rho)
@@ -1204,7 +1204,7 @@ class VectorialBesselBeam(ScalarBesselBeam, VectorialBeam):
         const = SPEED_OF_LIGHT*VACUUM_PERMEABILITY
 
         return (self._amplitude*cm.exp(1j*self._phase)/const
-                *0.25*(1+ma.cos(alpha))*(-1j)**ni*cm.exp(-1j*kz*z)
+                *0.25*(1+ma.cos(alpha))*(-1j)**ni*cm.exp(+1j*kz*z)
                 *(ma.sin(alpha)*(+cm.exp(+1j*phi)
                                   *ss.jv(ni+1, krho*rho)
                                  +cm.exp(-1j*phi)
@@ -1294,8 +1294,8 @@ class VectorialFrozenWave(VectorialBeam):
             return
 
         def amplitude_n(n):
-            func_real = lambda z: (self.func(z)*cm.exp(+2j*pi*z*n/self.L)).real
-            func_imag = lambda z: (self.func(z)*cm.exp(+2j*pi*z*n/self.L)).imag
+            func_real = lambda z: (self.func(z)*cm.exp(-2j*pi*z*n/self.L)).real
+            func_imag = lambda z: (self.func(z)*cm.exp(-2j*pi*z*n/self.L)).imag
 
             if self.centered:
                 an_real, err = quad(func_real, -self.L/2, self.L/2)
