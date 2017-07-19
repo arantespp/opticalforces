@@ -1,7 +1,0 @@
-L,N,Q,absorption_coefficient,amplitude,beam_pos_x,beam_pos_y,beam_pos_z,bessel_order,epsrel,force_type,fx,fy,fz,medium_refractive_index,phase,radius,reference_function,refractive_index,vacuum_wavelength,vacuum_wavenumber,wavelength,wavenumber
-0.0005,15,7658000.0,0,1,0,0,-4e-05,0,0.1,transmission,,,-1.2972280558612093e-10,1.33,0,2e-05,lip_sin_const_func,1.596,1.064e-06,5905000.0,8e-07,7854000.0
-0.0005,15,7658000.0,0,1,0,0,-3.0000000000000004e-05,0,0.1,transmission,,,-1.299475212981279e-10,1.33,0,2e-05,lip_sin_const_func,1.596,1.064e-06,5905000.0,8e-07,7854000.0
-0.0005,15,7658000.0,0,1,0,0,-2.5000000000000005e-05,0,0.1,transmission,,,-1.2758368105827553e-10,1.33,0,2e-05,lip_sin_const_func,1.596,1.064e-06,5905000.0,8e-07,7854000.0
-0.0005,15,7658000.0,0,1,0,0,-2e-05,0,0.1,transmission,,,-1.2411605751155863e-10,1.33,0,2e-05,lip_sin_const_func,1.596,1.064e-06,5905000.0,8e-07,7854000.0
-0.0005,15,7658000.0,0,1,0,0,3.25e-05,0,0.1,transmission,,,-5.837050142960385e-11,1.33,0,2e-05,lip_sin_const_func,1.596,1.064e-06,5905000.0,8e-07,7854000.0
-0.0005,15,7658000.0,0,1,0,0,-3.25e-05,0,0.1,transmission,,,-1.4663918789219479e-10,1.33,0,2e-05,lip_sin_const_func,1.596,1.064e-06,5905000.0,8e-07,7854000.0
