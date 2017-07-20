@@ -18,7 +18,6 @@ SPEED_OF_LIGHT = 299792458
 
 k0time = []
 
-
 def round_sig(num, sig=4):
     if isinstance(num, Number):
         if num < 0:
@@ -290,6 +289,7 @@ class SphericalParticle(object):
     @staticmethod
     def ortonormal_ray_direction(ray_direction, normal):
         dot = np.dot(ray_direction, normal)
+
         if dot == 0:
             return normal
 
@@ -316,25 +316,20 @@ class SphericalParticle(object):
         incident beam and the normal vector of the incident plane."""
 
         plane_normal = np.cross(ray_direction, normal)
+
         if np.linalg.norm(plane_normal) == 0:
             return 0
 
-        div = (np.dot(electric_field, plane_normal)
-               /np.linalg.norm(plane_normal))
+        val = (np.dot(electric_field, plane_normal)
+               /(np.linalg.norm(plane_normal)*np.linalg.norm(electric_field)))
 
-        if abs(div) >= 1:
-            return 0
-        else:
-            return ma.acos(abs(div))
+        return ma.acos(abs(val))
 
     @staticmethod
     def parallel_reflectivity(incident_angle, refracted_angle):
         if incident_angle == 0:
             nrel = (self._refractive_index/self._medium_refractive_index)
-            return (n-1)/(n+1)
-
-        if refracted_angle == pi/2:
-            return 1
+            return (nrel-1)/(nrel+1)
 
         return (ma.tan(incident_angle - refracted_angle)
                 / ma.tan(incident_angle + refracted_angle))**2
@@ -343,10 +338,7 @@ class SphericalParticle(object):
     def perpendicular_reflectivity(incident_angle, refracted_angle):
         if incident_angle == 0:
             nrel = (self._refractive_index/self._medium_refractive_index)
-            return -(n-1)/(n+1)
-
-        if refracted_angle == pi/2:
-            return 1
+            return -(nrel-1)/(nrel+1)
 
         return (ma.sin(incident_angle - refracted_angle)
                 / ma.sin(incident_angle + refracted_angle))**2
@@ -486,26 +478,87 @@ class SphericalParticle(object):
 if __name__ == '__main__':
     print("Please, visit: https://github.com/arantespp/opticalforces")
 
-    from beam import ScalarBesselGaussBeamSuperposition, Point
+    import math
+    import numpy as np
+    import pandas as pd
     import matplotlib.pyplot as plt
     from mpl_toolkits.mplot3d import Axes3D
     from matplotlib import cm as cmplt
 
-    tbb = ScalarBesselGaussBeamSuperposition(medium_refractive_index=1.33,
-                                             vacuum_wavelength=1064e-9)
-    tbb.R = 1e-3
-    tbb.q = 0
-    tbb.N = 21
-    tbb.axicon_angle_degree = 6
+    import sys
+    sys.path.insert(0, '../../opticalforces')
 
-    #z = np.linspace(0, 1.25*tbb.zmax, 251)
+    from beam import VectorialFrozenWave, Point
+    from particle import SphericalParticle
 
-    #plt.plot(z, [tbb.intensity(0, 0, z) for z in z])
+    fig_num = 0
+
+    L = 500e-6
+
+    z1 = -0.15*L
+    z2 = -0.025*L
+    z3 = +0.025*L
+    z4 = +0.15*L
+
+    def lip_sin_const_func(z):
+        if z1 <= z and z <= z2:
+            return math.sin(math.pi*(z - z2)/(z2 - z1))
+        elif z3 <= z and z <= z4:
+            return 1
+        else:
+            return 0
+
+    vfw2 = VectorialFrozenWave(centered=True)
+    vfw2.vacuum_wavelength = 1064e-9
+    vfw2.medium_refractive_index = 1.33
+    vfw2.N = 15
+    vfw2.L = L
+    vfw2.Q = 0.975*vfw2.wavenumber
+    vfw2.reference_function = lip_sin_const_func
+
+    ptc = SphericalParticle()
+    ptc.radius = 20e-6
+    ptc.medium_refractive_index = 1.33
+
+    beam_pos = (0, 0, 0)
+
+    #paramx = {'param': 'beam_pos_z',
+    #          'start': -5*L/10,
+    #          'stop': 5*L/10,
+    #          'num': 20,}
+
+    paramx = {'param': 'beam_pos_z',
+              'start': -40e-6,
+              'stop': -20e-6,
+              'num': 10,}
+
+    fig_num += 1
+    plt.figure(fig_num, figsize=(5*1.618, 5))
+
+    ptc.refractive_index = 1.2*1.33
+    #plt.plot([x*1e6 for x in X1], [1*f for f in F1], label='Total')
+
+    #X1I, F1I = ptc.geo_opt_force(vfw2, beam_pos, force_dir='fz', force_type='incident', paramx=paramx)
+    #plt.plot([x*1e6 for x in X1I], [1*f for f in F1I], label='Incident')
+
+    #X1T, F1T = ptc.geo_opt_force(vfw2, beam_pos, force_dir='fz', force_type='transmission', paramx=paramx)
+    #plt.plot([x*1e6 for x in X1T], [1*f for f in F1T], label='Transmission')
+
+    #X1R, F1R = ptc.geo_opt_force(vfw2, beam_pos, force_dir='fz', force_type='reflection', paramx=paramx)
+    #plt.plot([x*1e6 for x in X1R], [25*f for f in F1R], label='Reflection')
+
+    #plt.xlim([-L*1e6/2, L*1e6/2])
+
+    print(ptc.geo_opt_force(vfw2, Point(0, 0, -40.5e-6), force_dir='fz', force_type='transmission', epsrel=10/100))
+    print(ptc.geo_opt_force(vfw2, Point(0, 0, -32.5e-6), force_dir='fz', force_type='transmission', epsrel=10/100))
+
+    ##plt.legend(fontsize=12, loc=1)
+    #plt.tick_params(axis='x', labelsize=12)
+    ##plt.tick_params(axis='y', labelsize=12)
+    #plt.xlabel(r'z($\mu$m)', fontsize=14)
+    #plt.ylabel(r'F$_z$(z)', fontsize=14)
+    #plt.grid()
+    #plt.tight_layout()
+    #plt.savefig('LIP-sin-const-longit-4kind-forces-nrel=1o2.png')
+
     #plt.show()
-
-    ptc = SphericalParticle(medium_refractive_index=1.33)
-    ptc.refractive_index = 1.2
-    ptc.radius = 18e-6
-    ptc.absorption_coefficient = 0
-
-    print(ptc.geo_opt_force(tbb, Point(0, 0, -0.5*1e-3), 'fz', 'reflection', 1e-2))

@@ -483,7 +483,11 @@ class ScalarBesselBeam(Beam):
     @transversal_wavenumber.setter
     def transversal_wavenumber(self, krho):
         self._transversal_wavenumber = krho
-        self._bessel_spot = ss.jn_zeros(self.bessel_order, 1)[0]/krho
+
+        if krho != 0:
+            self._bessel_spot = ss.jn_zeros(self.bessel_order, 1)[0]/krho
+        else:
+            self._bessel_spot = ma.inf
 
         if self.longitudinal_wavenumber is not None:
             kz = self.longitudinal_wavenumber
@@ -548,7 +552,11 @@ class ScalarBesselBeam(Beam):
     @bessel_order.setter
     def bessel_order(self, value):
         self._bessel_order = value
-        self._bessel_spot = ss.jn_zeros(value,1)[0]/self.transversal_wavenumber
+        krho = self.transversal_wavenumber
+        if krho != 0:
+            self._bessel_spot = ss.jn_zeros(value,1)[0]/krho
+        else:
+            self._bessel_spot = ma.inf
 
     def psi(self, x1, x2, x3, system='cartesian'):
         if system == 'cylindrical':
