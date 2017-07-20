@@ -71,6 +71,11 @@ def check_geo_opt_database(func):
             params.update({param[1:]: val})
 
         def get_force_from_params(params):
+            # round_sig all numbers inside 'params'
+            for pkey, pvalue in params.items():
+                if isinstance(pvalue, Number):
+                    params[key] = round_sig(value)
+
             # load a dataframe or create if it doesn't exist
             if os.path.isfile(database_full_path):
                 df = pd.read_pickle(database_full_path)
@@ -141,6 +146,11 @@ def check_geo_opt_database(func):
 
                 # fill '_df' columns with 'df' values
                 _df[param], _df[force_dir] = df[param], df[force_dir]
+
+            # return all values which alread exist and don't create anymore
+            if paramx['num'] == 'all':
+                _df = _df.sort_values([param]).reset_index(drop=True)
+                return _df[param].values.tolist(), _df[force_dir].values.tolist()
 
             # add 'start' and 'stop' values to '_df'
             if not any(_df[param] == paramx['start']):
