@@ -74,7 +74,7 @@ def check_geo_opt_database(func):
             # round_sig all numbers inside 'params'
             for pkey, pvalue in params.items():
                 if isinstance(pvalue, Number):
-                    params[key] = round_sig(value)
+                    params[pkey] = round_sig(pvalue)
 
             # load a dataframe or create if it doesn't exist
             if os.path.isfile(database_full_path):
