@@ -28,23 +28,29 @@ import copy
 import scipy.special as ss
 from scipy.integrate import quad
 import numpy as np
+from sympy import diff
 
 # Speed of light.
 SPEED_OF_LIGHT = 299792458
 VACUUM_PERMEABILITY = pi*4e-7
 
+
 def derivative(func, x0):
+    '''This method makes the phase derivative in x, y and z using Fi-
+        nite Difference Coefficients found on
+        http://web.media.mit.edu/~crtaylor/calculator.html site.'''
+
     # Delta
     h = 1e-9
 
     # Denominator coefficient
-    den = 840*h
+    den = 12*h
 
     # Locations of Sampled Points
-    lsp = [-4, -3, -2, -1, 0, 1, 2, 3, 4]
+    lsp = [-2, -1, 1, 2,]
 
     # Finite Difference Coefficients
-    fdc = [3, -32, 168, -672, 0, 672, -168, 32, -3]
+    fdc = [1, -8, 8, -1]
 
     # Delta
     '''h = 1e-9
@@ -305,9 +311,6 @@ class Beam(object):
         """ k0 vector's direction.
 
         k0 vector's direction is defined by gradient of phase function.
-        This method makes the phase derivative in x, y and z using Fi-
-        nite Difference Coefficients found on
-        http://web.media.mit.edu/~crtaylor/calculator.htm site.
 
         Args:
             point (:obj:'Point'): point at which want to calculate
@@ -875,6 +878,10 @@ class ScalarBesselGaussBeamSuperposition(ScalarBesselGaussBeam):
             beam.q = (self.qr - 1j*2*pi*n_index/self.L)
             self.beams.append(beam)
 
+    def psi(self, x1, x2, x3, system='cartesian'):
+        return (self._amplitude*cm.exp(1j*self._phase)
+                *sum([beam.psi(x1, x2, x3, system) for beam in self.beams]))
+
 
 class ScalarFrozenWave(Beam):
     intrinsic_params = ('_Q',
@@ -994,7 +1001,6 @@ class ScalarFrozenWave(Beam):
             beam.longitudinal_wavenumber = self.Q + 2*pi*n_index/self.L
             beam.bessel_order = self.bessel_order
             self.beams.append(beam)
-            #self.amplitudes.append(amplitude_n(n_index))
 
     def psi(self, x1, x2, x3, system='cartesian'):
         return (self._amplitude*cm.exp(1j*self._phase)
@@ -1431,55 +1437,3 @@ class Point(object):
 
 if __name__ == "__main__":
     print("Please, visit: https://github.com/arantespp/opticalforces")
-
-    from particle import SphericalParticle
-    import matplotlib.pyplot as plt
-    from mpl_toolkits.mplot3d import Axes3D
-    from matplotlib import cm as cmplt
-
-    L = 1e-3
-
-    #def ref_func(z):
-    #    if z >= 0.2*L and z <= 0.5*L:
-    #        return sin()
-
-    def ref_func(z):
-        return 1 if abs(z) < 0.1*L else 0
-
-    vfw = VectorialFrozenWave(centered=True)
-    vfw.vacuum_wavelength = 1064e-9
-    vfw.medium_refractive_index = 1.33
-    vfw.N = 15
-    vfw.L = L
-    vfw.Q = 0.95*vfw.wavenumber
-    vfw.reference_function = ref_func
-    #vfw.electric_field_direction = lambda x1, x2, x3, sys: [1, 0, 0]
-
-    ptc = SphericalParticle()
-    ptc.radius = 17.5e-6
-    ptc.medium_refractive_index = 1.33
-
-    beam_pos = (0, 0, 0)
-
-    paramx = {'param': 'beam_pos_z',
-              'start': -3*L/10,
-              'stop': 3*L/10,
-              'num': 40,}
-
-    ptc.refractive_index = 1.2*1.33
-    X1, F1 = ptc.geo_opt_force(vfw, beam_pos, force_dir='fz', paramx=paramx)
-    plt.plot(X1, [1*f for f in F1], label=r'n$_{text{rel}}$: %s' % str(ptc.refractive_index/1.33))
-
-    ptc.refractive_index = 1.01*1.33
-    X2, F2 = ptc.geo_opt_force(vfw, beam_pos, force_dir='fz', paramx=paramx)
-    plt.plot(X2, [5*f for f in F2], label=r'n$_{text{rel}}$: %s' % str(ptc.refractive_index/1.33))
-
-    ptc.refractive_index = 1.005*1.33
-    X3, F3 = ptc.geo_opt_force(vfw, beam_pos, force_dir='fz', paramx=paramx)
-    plt.plot(X3, [10*f for f in F3], label=r'n$_{text{rel}}$: %s' % str(ptc.refractive_index/1.33))
-
-    ptc.refractive_index = 0.95*1.33
-    X4, F4 = ptc.geo_opt_force(vfw, beam_pos, force_dir='fz', paramx=paramx)
-    plt.plot(X4, [1*f for f in F4], label=r'n$_{text{rel}}$: %s' % str(ptc.refractive_index/1.33))
-
-    plt.show()

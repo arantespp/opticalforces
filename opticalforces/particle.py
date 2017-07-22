@@ -16,10 +16,11 @@ from beam import Point
 # Speed of light.
 SPEED_OF_LIGHT = 299792458
 
-k0time = []
 
 def round_sig(num, sig=4):
     if isinstance(num, Number):
+        if ma.isinf(num):
+            return num
         if num < 0:
             num = -num
             return -round(num, sig-int(ma.floor(ma.log10(num)))-1)
@@ -72,9 +73,9 @@ def check_geo_opt_database(func):
 
         def get_force_from_params(params):
             # round_sig all numbers inside 'params'
-            for pkey, pvalue in params.items():
-                if isinstance(pvalue, Number):
-                    params[pkey] = round_sig(pvalue)
+            ##for pkey, pvalue in params.items():
+            #    if isinstance(pvalue, Number):
+            #        params[pkey] = round_sig(pvalue)
 
             # load a dataframe or create if it doesn't exist
             if os.path.isfile(database_full_path):
@@ -168,7 +169,8 @@ def check_geo_opt_database(func):
 
             def next_param(row):
                 if row.name + 1 < _df.shape[0]:
-                    return (_df[param][row.name+1] + _df[param][row.name])/2
+                    return round_sig((_df[param][row.name+1]
+                                      + _df[param][row.name])/2)
                 return 0
 
             # add rows until params reach a interval minimal
@@ -412,9 +414,6 @@ class SphericalParticle(object):
         def dforce(theta, phi):
             # Beam particle surface: beam coordinates point that
             # match the point at theta and phi on particle surface.
-
-            #t0 = time.time()
-
             bps = Point(self.radius, theta, phi, 'spherical') - beam_pos
 
             _rho, _phi, _z = bps.cylindrical()
@@ -453,9 +452,6 @@ class SphericalParticle(object):
             _dforce = [(Qt.real*k + Qt.imag*d)*self._medium_refractive_index
                        * dpower/SPEED_OF_LIGHT for k, d in zip(k0, d0)]
 
-            #k0time.append(time.time()-t0)
-            #print('k0: ', np.mean(k0time))
-
             if force_dir == 'fx':
                 return _dforce[0]
             elif force_dir == 'fy':
@@ -468,107 +464,22 @@ class SphericalParticle(object):
         def quad_integration():
             def theta_integral(phi):
                 val, err = quad(lambda theta: dforce(theta, phi)*ma.sin(theta),
-                                0, pi, epsabs=0, epsrel=epsrel)
+                                0, pi, epsabs=1e-18, epsrel=epsrel)
                 return val
 
-            val, err = quad(theta_integral, 0, 2*pi, epsabs=0, epsrel=epsrel)
+            val, err = quad(theta_integral, 0, 2*pi, epsabs=1e-18, epsrel=epsrel)
 
             return val
 
         def dblquad_integration():
             val, err = dblquad(lambda th, ph: dforce(th, ph)*ma.sin(th),
                                0, 2*pi, lambda ph: 0, lambda ph: pi,
-                               epsabs=0, epsrel=epsrel)
+                               epsabs=1e-18, epsrel=epsrel)
 
             return val
 
-        return dblquad_integration()
+        return quad_integration()
 
 
 if __name__ == '__main__':
     print("Please, visit: https://github.com/arantespp/opticalforces")
-
-    import math
-    import numpy as np
-    import pandas as pd
-    import matplotlib.pyplot as plt
-    from mpl_toolkits.mplot3d import Axes3D
-    from matplotlib import cm as cmplt
-
-    import sys
-    sys.path.insert(0, '../../opticalforces')
-
-    from beam import VectorialFrozenWave, Point
-    from particle import SphericalParticle
-
-    fig_num = 0
-
-    L = 500e-6
-
-    z1 = -0.15*L
-    z2 = -0.025*L
-    z3 = +0.025*L
-    z4 = +0.15*L
-
-    def lip_sin_const_func(z):
-        if z1 <= z and z <= z2:
-            return math.sin(math.pi*(z - z2)/(z2 - z1))
-        elif z3 <= z and z <= z4:
-            return 1
-        else:
-            return 0
-
-    vfw2 = VectorialFrozenWave(centered=True)
-    vfw2.vacuum_wavelength = 1064e-9
-    vfw2.medium_refractive_index = 1.33
-    vfw2.N = 15
-    vfw2.L = L
-    vfw2.Q = 0.975*vfw2.wavenumber
-    vfw2.reference_function = lip_sin_const_func
-
-    ptc = SphericalParticle()
-    ptc.radius = 20e-6
-    ptc.medium_refractive_index = 1.33
-
-    beam_pos = (0, 0, 0)
-
-    #paramx = {'param': 'beam_pos_z',
-    #          'start': -5*L/10,
-    #          'stop': 5*L/10,
-    #          'num': 20,}
-
-    paramx = {'param': 'beam_pos_z',
-              'start': -40e-6,
-              'stop': -20e-6,
-              'num': 10,}
-
-    fig_num += 1
-    plt.figure(fig_num, figsize=(5*1.618, 5))
-
-    ptc.refractive_index = 1.2*1.33
-    #plt.plot([x*1e6 for x in X1], [1*f for f in F1], label='Total')
-
-    #X1I, F1I = ptc.geo_opt_force(vfw2, beam_pos, force_dir='fz', force_type='incident', paramx=paramx)
-    #plt.plot([x*1e6 for x in X1I], [1*f for f in F1I], label='Incident')
-
-    #X1T, F1T = ptc.geo_opt_force(vfw2, beam_pos, force_dir='fz', force_type='transmission', paramx=paramx)
-    #plt.plot([x*1e6 for x in X1T], [1*f for f in F1T], label='Transmission')
-
-    #X1R, F1R = ptc.geo_opt_force(vfw2, beam_pos, force_dir='fz', force_type='reflection', paramx=paramx)
-    #plt.plot([x*1e6 for x in X1R], [25*f for f in F1R], label='Reflection')
-
-    #plt.xlim([-L*1e6/2, L*1e6/2])
-
-    print(ptc.geo_opt_force(vfw2, Point(0, 0, -40.5e-6), force_dir='fz', force_type='transmission', epsrel=10/100))
-    print(ptc.geo_opt_force(vfw2, Point(0, 0, -32.5e-6), force_dir='fz', force_type='transmission', epsrel=10/100))
-
-    ##plt.legend(fontsize=12, loc=1)
-    #plt.tick_params(axis='x', labelsize=12)
-    ##plt.tick_params(axis='y', labelsize=12)
-    #plt.xlabel(r'z($\mu$m)', fontsize=14)
-    #plt.ylabel(r'F$_z$(z)', fontsize=14)
-    #plt.grid()
-    #plt.tight_layout()
-    #plt.savefig('LIP-sin-const-longit-4kind-forces-nrel=1o2.png')
-
-    #plt.show()
