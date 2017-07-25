@@ -379,7 +379,7 @@ class ScalarPlaneWave(Beam):
             z = Point(x1, x2, x3, system).z
 
         return (self._amplitude*cm.exp(1j*self._phase)
-                *cm.exp(1j*self._wavenumber*z))
+                *cm.exp(-1j*self._wavenumber*z))
 
 
 class ScalarBesselBeam(Beam):
@@ -570,7 +570,7 @@ class ScalarBesselBeam(Beam):
         return (self._amplitude*cm.exp(1j*self._phase)
                 *ss.jv(self._bessel_order,
                        self._transversal_wavenumber*rho)
-                * cm.exp(1j*self._longitudinal_wavenumber*z)
+                * cm.exp(-1j*self._longitudinal_wavenumber*z)
                 * cm.exp(1j*self._bessel_order*phi))
 
 
@@ -667,7 +667,7 @@ class ScalarGaussianBeam(Beam):
         k = self._wavenumber
         q = self._q
         return (self._amplitude*cm.exp(1j*self._phase)
-                * (1/(1+1j*z*2*q/k))*cm.exp(1j*z*k)
+                * (1/(1+1j*z*2*q/k))*cm.exp(+1j*z*k)
                 * cm.exp((-q*rho**2)/(1+1j*z*2*q/k)))
 
 
@@ -698,14 +698,14 @@ class ScalarBesselGaussBeam(ScalarBesselBeam, ScalarGaussianBeam):
         krho = self._transversal_wavenumber
 
         if z != 0:
-            Q = q - 1j*k/(2*z)
+            Q = q + 1j*k/(2*z)
             num = 1j*k/(2*z*Q)
-            exp1 = cm.exp(1j*k*(z+rho**2/(2*z)))
+            exp1 = cm.exp(-1j*k*(z+rho**2/(2*z)))
             bessel = ss.jv(0, num*krho*rho)
             exp2 = cm.exp(-(krho**2 + k**2*rho**2/z**2)/(4*Q))
             if ma.isinf(bessel.real) is True:
                 value = ss.jv(0, krho*rho)*cm.exp(-q*rho**2)
-            value = -num*exp1*bessel*exp2
+            value = num*exp1*bessel*exp2
         else:
             value = ss.jv(0, krho*rho)*cm.exp(-q*rho**2)
 
@@ -962,8 +962,8 @@ class ScalarFrozenWave(Beam):
             return
 
         def amplitude_n(n):
-            func_real = lambda z: (self.func(z)*cm.exp(-2j*pi*z*n/self.L)).real
-            func_imag = lambda z: (self.func(z)*cm.exp(-2j*pi*z*n/self.L)).imag
+            func_real = lambda z: (self.func(z)*cm.exp(+2j*pi*z*n/self.L)).real
+            func_imag = lambda z: (self.func(z)*cm.exp(+2j*pi*z*n/self.L)).imag
             if self.centered:
                 an_real, err = quad(func_real, -self.L/2, self.L/2)
                 an_imag, err = quad(func_imag, -self.L/2, self.L/2)
@@ -1135,7 +1135,7 @@ class VectorialBesselBeam(ScalarBesselBeam, VectorialBeam):
         kz, krho, ni, alpha = self.__some_params()
 
         return (self._amplitude*cm.exp(1j*self._phase)
-                *0.25*(1+ma.cos(alpha))*(-1j)**ni*cm.exp(+1j*kz*z)
+                *0.25*(1+ma.cos(alpha))*(-1j)**ni*cm.exp(-1j*kz*z)
                 *(+(1+ma.cos(alpha))*ss.jv(ni, krho*rho)
                   +0.5*(1-ma.cos(alpha))*(+cm.exp(+2j*phi)
                                            *ss.jv(ni+2, krho*rho)
@@ -1151,7 +1151,7 @@ class VectorialBesselBeam(ScalarBesselBeam, VectorialBeam):
         kz, krho, ni, alpha = self.__some_params()
 
         return (self._amplitude*cm.exp(1j*self._phase)
-                *0.25*(1+ma.cos(alpha))*(-1j)**ni*cm.exp(+1j*kz*z)
+                *0.25*(1+ma.cos(alpha))*(-1j)**ni*cm.exp(-1j*kz*z)
                 *(-0.5j*(1-ma.cos(alpha))*(+cm.exp(+2j*phi)
                                             *ss.jv(ni+2, krho*rho)
                                            -cm.exp(-2j*phi)
@@ -1166,7 +1166,7 @@ class VectorialBesselBeam(ScalarBesselBeam, VectorialBeam):
         kz, krho, ni, alpha = self.__some_params()
 
         return (self._amplitude*cm.exp(1j*self._phase)
-                *0.25*(1+ma.cos(alpha))*(-1j)**ni*cm.exp(+1j*kz*z)
+                *0.25*(1+ma.cos(alpha))*(-1j)**ni*cm.exp(-1j*kz*z)
                 *(+1j*ma.sin(alpha)*(+cm.exp(+1j*phi)
                                       *ss.jv(ni+1, krho*rho)
                                      -cm.exp(-1j*phi)
@@ -1183,7 +1183,7 @@ class VectorialBesselBeam(ScalarBesselBeam, VectorialBeam):
         const = SPEED_OF_LIGHT*VACUUM_PERMEABILITY
 
         return (self._amplitude*cm.exp(1j*self._phase)/const
-                *0.25*(1+ma.cos(alpha))*(-1j)**ni*cm.exp(+1j*kz*z)
+                *0.25*(1+ma.cos(alpha))*(-1j)**ni*cm.exp(-1j*kz*z)
                 *(-0.5j*(1-ma.cos(alpha))*(+cm.exp(+2j*phi)
                                             *ss.jv(ni+2, krho*rho)
                                            -cm.exp(-2j*phi)
@@ -1200,7 +1200,7 @@ class VectorialBesselBeam(ScalarBesselBeam, VectorialBeam):
         const = SPEED_OF_LIGHT*VACUUM_PERMEABILITY
 
         return (self._amplitude*cm.exp(1j*self._phase)/const
-                *0.25*(1+ma.cos(alpha))*(-1j)**ni*cm.exp(+1j*kz*z)
+                *0.25*(1+ma.cos(alpha))*(-1j)**ni*cm.exp(-1j*kz*z)
                 *(+(1+ma.cos(alpha))*ss.jv(ni, krho*rho)
                   -0.5*(1-ma.cos(alpha))*(+cm.exp(+2j*phi)
                                            *ss.jv(ni+2, krho*rho)
@@ -1218,7 +1218,7 @@ class VectorialBesselBeam(ScalarBesselBeam, VectorialBeam):
         const = SPEED_OF_LIGHT*VACUUM_PERMEABILITY
 
         return (self._amplitude*cm.exp(1j*self._phase)/const
-                *0.25*(1+ma.cos(alpha))*(-1j)**ni*cm.exp(+1j*kz*z)
+                *0.25*(1+ma.cos(alpha))*(-1j)**ni*cm.exp(-1j*kz*z)
                 *(ma.sin(alpha)*(+cm.exp(+1j*phi)
                                   *ss.jv(ni+1, krho*rho)
                                  +cm.exp(-1j*phi)
@@ -1308,8 +1308,8 @@ class VectorialFrozenWave(VectorialBeam):
             return
 
         def amplitude_n(n):
-            func_real = lambda z: (self.func(z)*cm.exp(-2j*pi*z*n/self.L)).real
-            func_imag = lambda z: (self.func(z)*cm.exp(-2j*pi*z*n/self.L)).imag
+            func_real = lambda z: (self.func(z)*cm.exp(+2j*pi*z*n/self.L)).real
+            func_imag = lambda z: (self.func(z)*cm.exp(+2j*pi*z*n/self.L)).imag
 
             if self.centered:
                 an_real, err = quad(func_real, -self.L/2, self.L/2)
