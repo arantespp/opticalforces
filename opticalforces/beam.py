@@ -790,7 +790,9 @@ class ScalarBesselGaussBeamSuperposition(ScalarBesselGaussBeam):
     @R.setter
     def R(self, value):
         self._R = value
-        self.L = 3*value**2
+
+        if self.L is None:
+            self.L = 3*value**2
 
         if self.axicon_angle is None and self.zmax is not None:
             self.axicon_angle = ma.atan(value/self.zmax)
@@ -840,7 +842,8 @@ class ScalarBesselGaussBeamSuperposition(ScalarBesselGaussBeam):
     @L.setter
     def L(self, L):
         self._L = L
-        self.qr = 6/L
+        if self.qr is None:
+            self.qr = 6/L
         self.__create_superposition()
 
     @property
