@@ -478,7 +478,7 @@ class SphericalParticle(object):
 
             return val
 
-        return quad_integration()
+        return dblquad_integration()
 
 
 if __name__ == '__main__':

@@ -28,7 +28,7 @@ import copy
 import scipy.special as ss
 from scipy.integrate import quad
 import numpy as np
-from sympy import diff
+
 
 # Speed of light.
 SPEED_OF_LIGHT = 299792458
@@ -1139,7 +1139,8 @@ class VectorialBesselBeam(ScalarBesselBeam, VectorialBeam):
 
         return (self._amplitude*cm.exp(1j*self._phase)
                 *0.25*(1+ma.cos(alpha))*(-1j)**ni*cm.exp(-1j*kz*z)
-                *(+(1+ma.cos(alpha))*ss.jv(ni, krho*rho)
+                *(+(1+ma.cos(alpha))*ss.jv(ni, krho*rho
+                    )
                   +0.5*(1-ma.cos(alpha))*(+cm.exp(+2j*phi)
                                            *ss.jv(ni+2, krho*rho)
                                           +cm.exp(-2j*phi)
